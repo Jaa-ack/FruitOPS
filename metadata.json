@@ -1,0 +1,5 @@
+{
+  "name": "FruitOPS - Orchard Management",
+  "description": "A smart operations management system for Shin-Shin Orchard. Integrates production logging, precision inventory grading, omni-channel order management, and CRM with AI-driven decision support.",
+  "requestFramePermissions": []
+}
