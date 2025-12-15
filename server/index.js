@@ -5,7 +5,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 const express = require('express');
 const bodyParser = require('body-parser');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
 const dbContainer = require('./db');
 const supabaseClient = require('./supabase');
@@ -26,11 +26,16 @@ const limiter = rateLimit({
   max: 120, // limit each IP to 120 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) =>
-    req.ip ||
-    req.headers['x-forwarded-for'] ||
-    req.headers['x-real-ip'] ||
-    'unknown',
+  keyGenerator: (req) => {
+    const xff = req.headers['x-forwarded-for'];
+    const candidate =
+      req.ip ||
+      (Array.isArray(xff) ? xff[0] : xff?.split(',')[0]) ||
+      req.headers['x-real-ip'] ||
+      req.socket?.remoteAddress ||
+      '0.0.0.0';
+    return ipKeyGenerator(candidate.trim());
+  },
 });
 app.use(limiter);
 
