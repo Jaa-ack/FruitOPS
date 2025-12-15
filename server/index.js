@@ -7,7 +7,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
-const dbContainer = require('./db');
 const supabaseClient = require('./supabase');
 const { GoogleGenAI } = require('@google/genai');
 
@@ -49,31 +48,28 @@ app.use((req, res, next) => {
 });
 
 app.get('/api/plots', async (req, res) => {
+  if (!supabaseClient.supabase) {
+    return res.status(503).json({ error: 'Supabase 未設定或連線失敗' });
+  }
   try {
-    if (supabaseClient.supabase) {
-      const rows = await supabaseClient.getPlots();
-      return res.json(rows || []);
-    }
-    await dbContainer.init();
-    res.json(dbContainer.data.plots || []);
+    const rows = await supabaseClient.getPlots();
+    res.json(rows || []);
   } catch (err) {
     console.error('GET /api/plots error', err);
-    res.status(500).json([]);
+    res.status(500).json({ error: '取得 plots 失敗', details: err.message });
   }
 });
 
 app.get('/api/logs', async (req, res) => {
+  if (!supabaseClient.supabase) {
+    return res.status(503).json({ error: 'Supabase 未設定或連線失敗' });
+  }
   try {
-    if (supabaseClient.supabase) {
-      const rows = await supabaseClient.getLogs();
-      return res.json(rows || []);
-    }
-    await dbContainer.init();
-    const rows = (dbContainer.data.logs || []).sort((a,b) => b.date.localeCompare(a.date));
-    res.json(rows);
+    const rows = await supabaseClient.getLogs();
+    res.json(rows || []);
   } catch (err) {
     console.error('GET /api/logs error', err);
-    res.status(500).json([]);
+    res.status(500).json({ error: '取得 logs 失敗', details: err.message });
   }
 });
 
@@ -94,15 +90,11 @@ app.post(
       return res.status(400).json({ ok: false, errors: errors.array() });
     }
     const { id, date, plotId, activity, cropType, notes, cost, worker } = req.body;
+    if (!supabaseClient.supabase) {
+      return res.status(503).json({ ok: false, error: 'Supabase 未設定或連線失敗' });
+    }
     try {
-      if (supabaseClient.supabase) {
-        await supabaseClient.addLog({ id, date, plotId, activity, cropType, notes, cost, worker });
-        return res.status(201).json({ ok: true });
-      }
-        await dbContainer.init();
-        dbContainer.data.logs = dbContainer.data.logs || [];
-        dbContainer.data.logs.push({ id, date, plotId, activity, cropType, notes, cost, worker });
-        await dbContainer.write();
+      await supabaseClient.addLog({ id, date, plotId, activity, cropType, notes, cost, worker });
       res.status(201).json({ ok: true });
     } catch (err) {
       console.error('POST /api/logs error', err);
@@ -112,52 +104,48 @@ app.post(
 );
 
 app.get('/api/inventory', async (req, res) => {
+  if (!supabaseClient.supabase) {
+    return res.status(503).json({ error: 'Supabase 未設定或連線失敗' });
+  }
   try {
-    if (supabaseClient.supabase) {
-      const rows = await supabaseClient.getInventory();
-      return res.json(rows || []);
-    }
-    await dbContainer.init();
-    res.json(dbContainer.data.inventory || []);
+    const rows = await supabaseClient.getInventory();
+    res.json(rows || []);
   } catch (err) {
     console.error('GET /api/inventory error', err);
-    res.status(500).json([]);
+    res.status(500).json({ error: '取得 inventory 失敗', details: err.message });
   }
 });
 
 app.get('/api/orders', async (req, res) => {
+  if (!supabaseClient.supabase) {
+    return res.status(503).json({ error: 'Supabase 未設定或連線失敗' });
+  }
   try {
-    if (supabaseClient.supabase) {
-      const rows = await supabaseClient.getOrders();
-      const mapped = (rows || []).map(r => ({ ...r, items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items }));
-      return res.json(mapped);
-    }
-    await dbContainer.init();
-    const rows = (dbContainer.data.orders || []).map(r => ({ ...r, items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items }));
-    res.json(rows);
+    const rows = await supabaseClient.getOrders();
+    const mapped = (rows || []).map(r => ({ ...r, items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items }));
+    res.json(mapped);
   } catch (err) {
     console.error('GET /api/orders error', err);
-    res.status(500).json([]);
+    res.status(500).json({ error: '取得 orders 失敗', details: err.message });
   }
 });
 
 app.get('/api/customers', async (req, res) => {
+  if (!supabaseClient.supabase) {
+    return res.status(503).json({ error: 'Supabase 未設定或連線失敗' });
+  }
   try {
-    if (supabaseClient.supabase) {
-      const rows = await supabaseClient.getCustomers();
-      return res.json(rows || []);
-    }
-    await dbContainer.init();
-    res.json(dbContainer.data.customers || []);
+    const rows = await supabaseClient.getCustomers();
+    res.json(rows || []);
   } catch (err) {
     console.error('GET /api/customers error', err);
-    res.status(500).json([]);
+    res.status(500).json({ error: '取得 customers 失敗', details: err.message });
   }
 });
 
 // health check
 app.get('/healthz', (req, res) => {
-  res.json({ status: 'ok', db: supabaseClient.supabase ? 'supabase' : 'local' });
+  res.json({ status: 'ok', db: supabaseClient.supabase ? 'supabase' : 'unconfigured' });
 });
 
 // AI proxy
