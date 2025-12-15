@@ -15,6 +15,7 @@ const { GoogleGenAI } = require('@google/genai');
 // call dbContainer.init() where needed
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 
 app.use(bodyParser.json());
@@ -25,6 +26,11 @@ const limiter = rateLimit({
   max: 120, // limit each IP to 120 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) =>
+    req.ip ||
+    req.headers['x-forwarded-for'] ||
+    req.headers['x-real-ip'] ||
+    'unknown',
 });
 app.use(limiter);
 
