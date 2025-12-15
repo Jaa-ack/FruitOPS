@@ -14,10 +14,10 @@ const GeminiAdvisor: React.FC<GeminiAdvisorProps> = ({ contextData }) => {
 
   // Pre-defined prompts for users
   const suggestions = [
-    "根據當前庫存，建議促銷策略 (Suggest promo based on inventory)",
-    "分析最近的銷售趨勢 (Analyze sales trends)",
-    "針對 VIP 客戶寫一段問候簡訊 (Write SMS for VIPs)",
-    "如何降低目前生產成本? (How to reduce production costs?)"
+    "根據目前庫存提出促銷建議",
+    "分析最近的銷售趨勢並建議行動",
+    "為 VIP 客戶撰寫親切的問候簡訊",
+    "如何降低目前生產成本並提升效率?"
   ];
 
   const handleAsk = async (query: string) => {
@@ -36,22 +36,26 @@ const GeminiAdvisor: React.FC<GeminiAdvisorProps> = ({ contextData }) => {
       topCustomers: contextData.customers.filter((c: any) => c.segment === 'VIP').map((c: any) => c.name)
     });
 
-    const result = await getGeminiAdvice(simplifiedContext, query);
-    setResponse(result);
+    try {
+      const res = await (await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context: simplifiedContext, prompt: query }) })).json();
+      setResponse(res.text || res);
+    } catch (err) {
+      setResponse('AI 服務發生錯誤');
+    }
     setLoading(false);
   };
 
   if (!isOpen) {
     return (
       <button 
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 z-50 flex items-center gap-2 group"
-      >
-        <Sparkles size={24} className="animate-pulse" />
-        <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 font-bold whitespace-nowrap">
-            Ask AI Advisor
-        </span>
-      </button>
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 z-50 flex items-center gap-2 group"
+        >
+          <Sparkles size={24} className="animate-pulse" />
+          <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 font-bold whitespace-nowrap">
+              詢問 AI 顧問
+          </span>
+        </button>
     );
   }
 
@@ -60,7 +64,7 @@ const GeminiAdvisor: React.FC<GeminiAdvisorProps> = ({ contextData }) => {
       <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-2xl flex justify-between items-center text-white">
         <div className="flex items-center gap-2">
             <Sparkles size={20} />
-            <h3 className="font-bold">FruitOPS 智慧顧問</h3>
+            <h3 className="font-bold">欣欣果園 智慧顧問</h3>
         </div>
         <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded">
             ✕

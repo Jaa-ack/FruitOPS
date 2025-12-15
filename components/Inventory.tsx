@@ -59,7 +59,7 @@ const Inventory: React.FC<InventoryProps> = ({ inventory }) => {
           {inventory.map(item => (
               <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow relative overflow-hidden">
                   <div className={`absolute top-0 right-0 px-3 py-1 rounded-bl-xl text-xs font-bold border-l border-b ${getGradeColor(item.grade)}`}>
-                      Grade {item.grade}
+                      等級 {item.grade}
                   </div>
                   
                   <div className="mb-4">

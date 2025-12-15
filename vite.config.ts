@@ -8,11 +8,20 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/api': {
+            target: 'http://localhost:4000',
+            changeOrigin: true,
+            secure: false,
+            rewrite: (path) => path.replace(/^\/api/, '/api')
+          }
+        },
       },
       plugins: [react()],
+      // Do NOT inject server-only API keys into the client bundle.
+      // The GEMINI API key is server-only and must be accessed from the server (e.g. /api/ai proxy).
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        // keep other VITE_ prefixed public envs here if needed
       },
       resolve: {
         alias: {

@@ -1,0 +1,8 @@
+name: fruitops
+channels:
+  - conda-forge
+dependencies:
+  - nodejs=18
+  - python=3.10  # 可選；若不需要 python 可移除
+  - yarn  # 可選
+  - git   # 可選

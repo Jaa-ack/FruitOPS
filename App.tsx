@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Sprout, ShoppingCart, Users, Package, Menu, X } from 'lucide-react';
-import { MOCK_CUSTOMERS, MOCK_INVENTORY, MOCK_LOGS, MOCK_ORDERS, MOCK_PLOTS } from './constants';
+import { fetchAll, postLog } from './services/api';
 import Dashboard from './components/Dashboard';
 import Production from './components/Production';
 import Inventory from './components/Inventory';
@@ -16,17 +16,17 @@ const Sidebar = ({ mobile, closeMobile }: { mobile?: boolean, closeMobile?: () =
   const isActive = (path: string) => location.pathname === path;
 
   const links = [
-    { path: '/', name: '總覽 (Dashboard)', icon: <LayoutDashboard size={20} /> },
-    { path: '/production', name: '智慧生產 (Production)', icon: <Sprout size={20} /> },
-    { path: '/inventory', name: '分級庫存 (Inventory)', icon: <Package size={20} /> },
-    { path: '/orders', name: '訂單管理 (Orders)', icon: <ShoppingCart size={20} /> },
-    { path: '/crm', name: '顧客關係 (CRM)', icon: <Users size={20} /> },
+    { path: '/', name: '總覽', icon: <LayoutDashboard size={20} /> },
+    { path: '/production', name: '智慧生產', icon: <Sprout size={20} /> },
+    { path: '/inventory', name: '分級庫存', icon: <Package size={20} /> },
+    { path: '/orders', name: '訂單管理', icon: <ShoppingCart size={20} /> },
+    { path: '/crm', name: '顧客關係', icon: <Users size={20} /> },
   ];
 
   return (
     <div className={`h-full bg-emerald-900 text-white flex flex-col ${mobile ? 'w-64' : 'w-64 hidden md:flex'}`}>
       <div className="p-6 border-b border-emerald-800 flex justify-between items-center">
-        <h1 className="text-xl font-bold tracking-tight">FruitOPS 🍎</h1>
+        <h1 className="text-xl font-bold tracking-tight">欣欣果園 🍎</h1>
         {mobile && <button onClick={closeMobile}><X size={20}/></button>}
       </div>
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -47,34 +47,40 @@ const Sidebar = ({ mobile, closeMobile }: { mobile?: boolean, closeMobile?: () =
         ))}
       </nav>
       <div className="p-4 border-t border-emerald-800 text-xs text-emerald-400 text-center">
-        Shin-Shin Orchard System <br/> v1.0.0
+        欣欣果園系統 <br/> v1.0.0
       </div>
     </div>
   );
 };
 
 const App: React.FC = () => {
-  // Global State (In a real app, use Context or Redux)
-  const [logs, setLogs] = useState(MOCK_LOGS);
+  // Global State (fetched from API)
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Data State
-  const plots = MOCK_PLOTS;
-  const inventory = MOCK_INVENTORY;
-  const orders = MOCK_ORDERS;
-  const customers = MOCK_CUSTOMERS;
+  const [plots, setPlots] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
 
   const handleAddLog = (log: FarmLog) => {
-    setLogs([log, ...logs]);
+    // Send to API then refresh logs
+    postLog(log).then(() => fetchAll('logs').then((r) => setLogs(r)));
   };
 
-  const globalContext = {
-    plots,
-    inventory,
-    orders,
-    customers,
-    logs
-  };
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchAll('plots'), fetchAll('inventory'), fetchAll('orders'), fetchAll('customers'), fetchAll('logs')])
+      .then(([p, i, o, c, l]) => {
+        setPlots(p); setInventory(i); setOrders(o); setCustomers(c); setLogs(l);
+      })
+      .catch((err) => console.error('Fetch error', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const globalContext = { plots, inventory, orders, customers, logs };
 
   return (
     <Router>
@@ -99,7 +105,7 @@ const App: React.FC = () => {
                 <button className="md:hidden text-gray-600" onClick={() => setIsMobileMenuOpen(true)}>
                     <Menu size={24} />
                 </button>
-                <h2 className="text-gray-800 font-semibold md:hidden">FruitOPS</h2>
+                <h2 className="text-gray-800 font-semibold md:hidden">欣欣果園</h2>
             </div>
             <div className="flex items-center gap-4">
                <span className="text-sm text-gray-500 hidden md:inline">欣欣果園智慧營運管理系統</span>

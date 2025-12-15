@@ -12,7 +12,7 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog }) => {
   const [showForm, setShowForm] = useState(false);
   const [newLog, setNewLog] = useState<Partial<FarmLog>>({
     activity: 'Pruning',
-    cropType: 'Honey Peach',
+    cropType: '蜜桃',
     cost: 0,
     worker: ''
   });
@@ -31,7 +31,7 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog }) => {
     };
     onAddLog(log);
     setShowForm(false);
-    setNewLog({ activity: 'Pruning', cropType: 'Honey Peach', cost: 0, worker: '' });
+    setNewLog({ activity: 'Pruning', cropType: '蜜桃', cost: 0, worker: '' });
   };
 
   const getIcon = (activity: string) => {
@@ -43,6 +43,18 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog }) => {
       default: return <Hammer size={16} />;
     }
   };
+
+  const getActivityLabel = (activity: string) => {
+    switch(activity) {
+      case 'Fertilize': return '施肥';
+      case 'Pesticide': return '噴藥';
+      case 'Pruning': return '修剪';
+      case 'Weeding': return '除草';
+      case 'Bagging': return '套袋';
+      case 'Harvest': return '採收';
+      default: return activity;
+    }
+  };
   
   // Helper for missing icon in import
   const PackageIcon = ({size}: {size: number}) => (
@@ -52,13 +64,13 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">智慧生產管理 (Production)</h2>
+        <h2 className="text-2xl font-bold text-gray-800">智慧生產管理</h2>
         <button
           onClick={() => setShowForm(!showForm)}
           className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
         >
           <ClipboardList size={20} />
-          {showForm ? '取消 (Cancel)' : '新增日誌 (Add Log)'}
+          {showForm ? '取消' : '新增日誌'}
         </button>
       </div>
 
@@ -82,12 +94,13 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog }) => {
                 value={newLog.activity}
                 onChange={e => setNewLog({ ...newLog, activity: e.target.value as any })}
               >
-                <option value="Fertilize">施肥 (Fertilize)</option>
-                <option value="Pesticide">噴藥 (Pesticide)</option>
-                <option value="Pruning">修剪 (Pruning)</option>
-                <option value="Weeding">除草 (Weeding)</option>
-                <option value="Bagging">套袋 (Bagging)</option>
-                <option value="Harvest">採收 (Harvest)</option>
+                
+                  <option value="Fertilize">施肥</option>
+                  <option value="Pesticide">噴藥</option>
+                  <option value="Pruning">修剪</option>
+                  <option value="Weeding">除草</option>
+                  <option value="Bagging">套袋</option>
+                  <option value="Harvest">採收</option>
               </select>
             </div>
             <div>
@@ -118,7 +131,7 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog }) => {
               />
             </div>
             <div className="md:col-span-2 flex justify-end">
-                <button type="submit" className="bg-brand-600 text-white px-6 py-2 rounded-lg hover:bg-brand-700">儲存紀錄 (Save)</button>
+                <button type="submit" className="bg-brand-600 text-white px-6 py-2 rounded-lg hover:bg-brand-700">儲存紀錄</button>
             </div>
           </form>
         </div>
@@ -136,9 +149,9 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog }) => {
                     </div>
                     <div className="text-right">
                         <span className={`text-xs px-2 py-1 rounded-full ${plot.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                            {plot.status}
+                            {plot.status === 'Active' ? '運作中' : plot.status === 'Maintenance' ? '維護中' : plot.status}
                         </span>
-                        <p className="text-xs mt-1 font-medium text-brand-600">Health: {plot.health}%</p>
+                          <p className="text-xs mt-1 font-medium text-brand-600">健康度：{plot.health}%</p>
                     </div>
                 </div>
             ))}
@@ -167,12 +180,12 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog }) => {
                                         <Calendar size={14} /> {log.date}
                                     </td>
                                     <td className="p-4">
-                                        <div className="flex items-center gap-2 font-medium text-gray-700">
-                                            <span className="p-1.5 bg-brand-50 text-brand-600 rounded-md">
-                                                {getIcon(log.activity)}
-                                            </span>
-                                            {log.activity}
-                                        </div>
+                                      <div className="flex items-center gap-2 font-medium text-gray-700">
+                                        <span className="p-1.5 bg-brand-50 text-brand-600 rounded-md">
+                                          {getIcon(log.activity)}
+                                        </span>
+                                        {getActivityLabel(log.activity)}
+                                      </div>
                                     </td>
                                     <td className="p-4 text-gray-600">{plotName}</td>
                                     <td className="p-4 text-gray-600">{log.worker}</td>

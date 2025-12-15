@@ -7,8 +7,27 @@ interface OrdersProps {
 }
 
 const Orders: React.FC<OrdersProps> = ({ orders }) => {
-  const [filter, setFilter] = useState('All');
+    const [filter, setFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
+
+    const statusOptions: { key: string; label: string }[] = [
+        { key: 'All', label: '全部' },
+        { key: 'Pending', label: '待處理' },
+        { key: 'Confirmed', label: '已確認' },
+        { key: 'Shipped', label: '已出貨' },
+        { key: 'Completed', label: '已完成' },
+    ];
+
+    const mapStatusName = (status: string) => {
+        switch(status) {
+            case 'Pending': return '待處理';
+            case 'Confirmed': return '已確認';
+            case 'Shipped': return '已出貨';
+            case 'Completed': return '已完成';
+            case 'Cancelled': return '已取消';
+            default: return status;
+        }
+    };
 
   const filteredOrders = orders.filter(order => {
     const matchesFilter = filter === 'All' || order.status === filter;
@@ -26,6 +45,17 @@ const Orders: React.FC<OrdersProps> = ({ orders }) => {
     }
   };
 
+    const mapChannelName = (channel: string) => {
+        switch(channel) {
+            case 'Line': return 'LINE';
+            case 'Phone': return '電話';
+            case 'Google Form': return 'Google 表單';
+            case 'Wholesale': return '批發';
+            case 'Direct': return '直接銷售';
+            default: return channel;
+        }
+    };
+
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
         'Pending': 'bg-yellow-100 text-yellow-800',
@@ -36,15 +66,15 @@ const Orders: React.FC<OrdersProps> = ({ orders }) => {
     };
     return (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
-            {status}
+            {mapStatusName(status)}
         </span>
     );
   };
 
   return (
     <div className="space-y-6">
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-2xl font-bold text-gray-800">全通路訂單 (Orders)</h2>
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+     <h2 className="text-2xl font-bold text-gray-800">全通路訂單</h2>
         <div className="flex gap-2">
             <div className="relative">
                 <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
@@ -63,18 +93,18 @@ const Orders: React.FC<OrdersProps> = ({ orders }) => {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-2">
-          {['All', 'Pending', 'Confirmed', 'Shipped', 'Completed'].map(status => (
-              <button 
-                key={status}
-                onClick={() => setFilter(status)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filter === status ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
-              >
-                  {status}
-              </button>
-          ))}
+                    {statusOptions.map(status => (
+                            <button 
+                                key={status.key}
+                                onClick={() => setFilter(status.key)}
+                                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filter === status.key ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}
+                            >
+                                    {status.label}
+                            </button>
+                    ))}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
                 <thead className="bg-gray-50 text-gray-600 text-sm font-semibold border-b border-gray-200">
@@ -96,7 +126,7 @@ const Orders: React.FC<OrdersProps> = ({ orders }) => {
                                 <td className="p-4">
                                     <div className="flex items-center gap-2" title={order.channel}>
                                         {getChannelIcon(order.channel)}
-                                        <span className="hidden md:inline text-gray-600">{order.channel}</span>
+                                        <span className="hidden md:inline text-gray-600">{mapChannelName(order.channel)}</span>
                                     </div>
                                 </td>
                                 <td className="p-4 font-medium text-gray-800">{order.customerName}</td>

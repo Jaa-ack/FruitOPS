@@ -21,15 +21,25 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
     revenue,
     ordersPending: pendingOrders,
     lowStockItems,
-    topCrop: 'Honey Peach' // Simplified for mock
+    topCrop: '蜜桃' // Simplified for mock, translated to Chinese
   };
 
   // Chart Data Preparation
+  const channelDisplay = (ch: string) => {
+    switch(ch) {
+      case 'Direct': return '直接銷售';
+      case 'Line': return 'LINE';
+      case 'Wholesale': return '批發';
+      case 'Phone': return '電話';
+      default: return ch;
+    }
+  };
+
   const channelData = [
-    { name: 'Direct', value: orders.filter(o => o.channel === 'Direct').length },
-    { name: 'Line', value: orders.filter(o => o.channel === 'Line').length },
-    { name: 'Wholesale', value: orders.filter(o => o.channel === 'Wholesale').length },
-    { name: 'Phone', value: orders.filter(o => o.channel === 'Phone').length },
+    { name: channelDisplay('Direct'), value: orders.filter(o => o.channel === 'Direct').length },
+    { name: channelDisplay('Line'), value: orders.filter(o => o.channel === 'Line').length },
+    { name: channelDisplay('Wholesale'), value: orders.filter(o => o.channel === 'Wholesale').length },
+    { name: channelDisplay('Phone'), value: orders.filter(o => o.channel === 'Phone').length },
   ];
 
   const inventoryData = inventory.map(i => ({
@@ -45,7 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
             <DollarSign size={24} />
           </div>
           <div>
-            <p className="text-sm text-gray-500">季總營收 (Total Revenue)</p>
+            <p className="text-sm text-gray-500">季總營收</p>
             <p className="text-2xl font-bold text-gray-800">NT$ {metrics.revenue.toLocaleString()}</p>
           </div>
         </div>
@@ -55,7 +65,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
             <Package size={24} />
           </div>
           <div>
-            <p className="text-sm text-gray-500">待處理訂單 (Pending)</p>
+            <p className="text-sm text-gray-500">待處理訂單</p>
             <p className="text-2xl font-bold text-gray-800">{metrics.ordersPending}</p>
           </div>
         </div>
@@ -65,7 +75,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
             <AlertTriangle size={24} />
           </div>
           <div>
-            <p className="text-sm text-gray-500">庫存預警 (Low Stock)</p>
+            <p className="text-sm text-gray-500">庫存預警</p>
             <p className="text-2xl font-bold text-gray-800">{metrics.lowStockItems}</p>
           </div>
         </div>
@@ -75,7 +85,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
             <TrendingUp size={24} />
           </div>
           <div>
-            <p className="text-sm text-gray-500">主力作物 (Top Crop)</p>
+            <p className="text-sm text-gray-500">主力作物</p>
             <p className="text-xl font-bold text-gray-800">{metrics.topCrop}</p>
           </div>
         </div>
@@ -84,7 +94,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales Channel Distribution */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">銷售通路分佈 (Sales Channels)</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">銷售通路分佈</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -111,7 +121,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
 
         {/* Inventory Levels */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">當前庫存水位 (Current Inventory)</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">當前庫存水位</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={inventoryData} layout="vertical">

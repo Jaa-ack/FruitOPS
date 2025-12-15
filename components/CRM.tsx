@@ -10,13 +10,23 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
   
   const getSegmentStyle = (segment: string) => {
     switch(segment) {
-        case 'VIP': return 'bg-purple-100 text-purple-700 border-purple-200';
-        case 'Stable': return 'bg-blue-100 text-blue-700 border-blue-200';
-        case 'New': return 'bg-green-100 text-green-700 border-green-200';
-        case 'At Risk': return 'bg-red-100 text-red-700 border-red-200';
+                case 'VIP': return 'bg-purple-100 text-purple-700 border-purple-200';
+                case 'Stable': return 'bg-blue-100 text-blue-700 border-blue-200';
+                case 'New': return 'bg-green-100 text-green-700 border-green-200';
+                case 'At Risk': return 'bg-red-100 text-red-700 border-red-200';
         default: return 'bg-gray-100 text-gray-700';
     }
   };
+
+    const mapSegmentName = (segment: string) => {
+        switch(segment) {
+            case 'VIP': return '貴賓';
+            case 'Stable': return '穩定客群';
+            case 'New': return '新客';
+            case 'At Risk': return '流失風險';
+            default: return segment;
+        }
+    };
 
   return (
     <div className="space-y-6">
@@ -51,7 +61,7 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                             </div>
                         </div>
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${getSegmentStyle(customer.segment)}`}>
-                            {customer.segment}
+                            {mapSegmentName(customer.segment)}
                         </span>
                     </div>
                     
