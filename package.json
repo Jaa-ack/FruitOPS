@@ -5,6 +5,9 @@
   "type": "commonjs",
   "scripts": {
     "dev": "vite",
+    "dev:server": "npm run dev --prefix server",
+    "dev:kill": "lsof -ti tcp:4000 | xargs -r kill -9 || true",
+    "dev:all": "npm run dev:kill && npm run dev --prefix server & vite",
     "build": "vite build",
     "preview": "vite preview"
   },

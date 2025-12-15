@@ -66,8 +66,43 @@ const App: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
 
   const handleAddLog = (log: FarmLog) => {
-    // Send to API then refresh logs
-    postLog(log).then(() => fetchAll('logs').then((r) => setLogs(r)));
+    // Send to API then refresh logs with error handling
+    postLog(log)
+      .then(() => {
+        console.log('✓ 日誌已新增，正在刷新...');
+        return fetchAll('logs');
+      })
+      .then((r) => {
+        console.log('✓ 日誌列表已刷新:', r);
+        setLogs(r);
+      })
+      .catch((err) => {
+        console.error('❌ 新增日誌失敗:', err);
+        alert('新增日誌失敗，請檢查網路連線');
+      });
+  };
+
+  const handleUpdateLog = async (log: FarmLog) => {
+    await fetch(`/api/logs/${log.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(log),
+    });
+    const refreshed = await fetchAll('logs');
+    setLogs(refreshed);
+  };
+
+  const handleInventoryChange = () => {
+    // Refresh inventory after update
+    fetchAll('inventory').then((i) => setInventory(i));
+  };
+
+  const handleOrderChange = () => {
+    // Refresh orders and inventory after update (扣庫存會影響庫存頁)
+    Promise.all([fetchAll('orders'), fetchAll('inventory')]).then(([o, i]) => {
+      setOrders(o);
+      setInventory(i);
+    });
   };
 
   useEffect(() => {
@@ -120,9 +155,9 @@ const App: React.FC = () => {
             <div className="max-w-7xl mx-auto pb-20">
               <Routes>
                 <Route path="/" element={<Dashboard orders={orders} inventory={inventory} />} />
-                <Route path="/production" element={<Production plots={plots} logs={logs} onAddLog={handleAddLog} />} />
-                <Route path="/inventory" element={<Inventory inventory={inventory} />} />
-                <Route path="/orders" element={<Orders orders={orders} />} />
+                <Route path="/production" element={<Production plots={plots} logs={logs} onAddLog={handleAddLog} onUpdateLog={handleUpdateLog} />} />
+                <Route path="/inventory" element={<Inventory inventory={inventory} onInventoryChange={handleInventoryChange} />} />
+                <Route path="/orders" element={<Orders orders={orders} onOrderChange={handleOrderChange} />} />
                 <Route path="/crm" element={<CRM customers={customers} />} />
               </Routes>
             </div>

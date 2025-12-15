@@ -3,38 +3,34 @@ import { Archive, ChevronDown, ChevronUp, Plus, Edit2, Trash2 } from 'lucide-rea
 
 interface InventoryDetail {
   id: string;
-  productName: string;
+  product_name: string;
   grade: string;
   quantity: number;
-  location: string;
-  locationId: string;
-  harvestDate?: string;
+  location_name: string;
+  location_id: string;
+  harvest_date?: string;
 }
 
 interface InventorySummary {
-  productName: string;
-  totalQuantity: number;
-  gradeCount: number;
-  locationCount: number;
+  product_name: string;
+  total_quantity: number;
+  grade_count: number;
+  location_count: number;
 }
 
-const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> = ({ onInventoryChange }) => {
+const Inventory: React.FC<{ inventory: any[] }> = () => {
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [summarySummary, setSummarySummary] = useState<InventorySummary[]>([]);
   const [detailData, setDetailData] = useState<InventoryDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [storageLocations, setStorageLocations] = useState<any[]>([]);
-  const [productNames, setProductNames] = useState<string[]>([]);
-  const [gradesByProduct, setGradesByProduct] = useState<Record<string, string[]>>({});
-  const [moveAmount, setMoveAmount] = useState(0);
-  const [moveTarget, setMoveTarget] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [moveModal, setMoveModal] = useState<{ open: boolean; item: InventoryDetail | null }>({ open: false, item: null });
+  const [editingItem, setEditingItem] = useState<InventoryDetail | null>(null);
   const [formData, setFormData] = useState({
-    productName: '',
+    product_name: '',
     grade: 'A',
     quantity: 0,
-    locationId: ''
+    location_id: ''
   });
 
   // 獲取數據
@@ -45,29 +41,15 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [summaryRes, detailRes, locRes, gradesRes] = await Promise.all([
+      const [summaryRes, detailRes, locRes] = await Promise.all([
         fetch('/api/inventory-summary'),
         fetch('/api/inventory-detail'),
-        fetch('/api/storage-locations'),
-        fetch('/api/product-grades')
+        fetch('/api/storage-locations')
       ]);
 
       if (summaryRes.ok) setSummarySummary(await summaryRes.json());
       if (detailRes.ok) setDetailData(await detailRes.json());
       if (locRes.ok) setStorageLocations(await locRes.json());
-      if (gradesRes.ok) {
-        const gradeData = await gradesRes.json();
-        if (Array.isArray(gradeData)) {
-          const map: Record<string, string[]> = {};
-          for (const row of gradeData) {
-            const name = row.product_name || row.productName;
-            const grades = row.grades || [];
-            if (name && Array.isArray(grades)) map[name] = grades;
-          }
-          setGradesByProduct(map);
-          setProductNames(Object.keys(map));
-        }
-      }
     } catch (err) {
       console.error('Failed to fetch inventory:', err);
     } finally {
@@ -86,7 +68,7 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
   };
 
   const getProductDetails = (productName: string) => {
-    return detailData.filter(d => d.productName === productName);
+    return detailData.filter(d => d.product_name === productName);
   };
 
   const handleSaveItem = async () => {
@@ -94,19 +76,13 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
       const response = await fetch('/api/inventory-v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productName: formData.productName,
-          grade: formData.grade,
-          quantity: Number(formData.quantity) || 0,
-          locationId: formData.locationId
-        })
+        body: JSON.stringify(formData)
       });
 
       if (response.ok) {
         setShowAddForm(false);
-        setFormData({ productName: '', grade: 'A', quantity: 0, locationId: '' });
+        setFormData({ product_name: '', grade: 'A', quantity: 0, location_id: '' });
         await fetchData();
-        onInventoryChange?.();
       } else {
         alert('保存失敗');
       }
@@ -122,37 +98,6 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
       acc[item.grade].push(item);
       return acc;
     }, {} as Record<string, InventoryDetail[]>);
-  };
-
-  const handleMoveSubmit = async (amount: number, targetLocationId: string) => {
-    if (!moveModal.item) return;
-    const qty = Number(amount) || 0;
-    if (qty <= 0) {
-      alert('移動數量需大於 0');
-      return;
-    }
-    if (qty > (moveModal.item.quantity || 0)) {
-      alert('移動數量不能超過庫存');
-      return;
-    }
-    if (!targetLocationId || targetLocationId === moveModal.item.locationId) {
-      alert('請選擇不同的目標儲位');
-      return;
-    }
-    try {
-      const res = await fetch('/api/inventory-move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceId: moveModal.item.id, targetLocationId, amount: qty })
-      });
-      if (!res.ok) throw new Error('move failed');
-      setMoveModal({ open: false, item: null });
-      await fetchData();
-      onInventoryChange?.();
-    } catch (err) {
-      console.error('Move inventory error', err);
-      alert('移動失敗');
-    }
   };
 
   if (loading) {
@@ -175,29 +120,21 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
       {showAddForm && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg space-y-3">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <select
+            <input
+              type="text"
+              placeholder="產品名稱"
+              value={formData.product_name}
+              onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
               className="p-2 border rounded"
-              value={formData.productName}
-              onChange={(e) => {
-                const name = e.target.value;
-                const grades = gradesByProduct[name] || ['A', 'B', 'C'];
-                const newGrade = grades[0] || 'A';
-                setFormData({ ...formData, productName: name, grade: newGrade });
-              }}
-            >
-              <option value="">-- 選擇產品 --</option>
-              {productNames.map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
+            />
             <select
               value={formData.grade}
               onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
               className="p-2 border rounded"
             >
-              {(gradesByProduct[formData.productName] || ['A','B','C']).map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
+              <option value="A">A 級</option>
+              <option value="B">B 級</option>
+              <option value="C">C 級</option>
             </select>
             <input
               type="number"
@@ -207,8 +144,8 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
               className="p-2 border rounded"
             />
             <select
-              value={formData.locationId}
-              onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
+              value={formData.location_id}
+              onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
               className="p-2 border rounded"
             >
               <option value="">-- 選擇位置 --</option>
@@ -249,31 +186,31 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
             </thead>
             <tbody>
               {summarySummary.map(summary => {
-                const isExpanded = expandedProducts.has(summary.productName);
-                const productDetails = getProductDetails(summary.productName);
+                const isExpanded = expandedProducts.has(summary.product_name);
+                const productDetails = getProductDetails(summary.product_name);
                 const groupedByGrade = groupByGrade(productDetails);
 
                 return (
-                  <React.Fragment key={summary.productName}>
+                  <React.Fragment key={summary.product_name}>
                     {/* 摘要行 */}
                     <tr className="border-b hover:bg-gray-50 cursor-pointer">
                       <td className="p-4">
                         <button
-                          onClick={() => toggleProduct(summary.productName)}
+                          onClick={() => toggleProduct(summary.product_name)}
                           className="flex items-center gap-2 font-medium text-gray-800"
                         >
                           {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                          {summary.productName}
+                          {summary.product_name}
                         </button>
                       </td>
                       <td className="p-4 text-right font-semibold text-blue-600">
-                        {summary.totalQuantity}
+                        {summary.total_quantity}
                       </td>
-                      <td className="p-4 text-right">{summary.gradeCount}</td>
-                      <td className="p-4 text-right">{summary.locationCount}</td>
+                      <td className="p-4 text-right">{summary.grade_count}</td>
+                      <td className="p-4 text-right">{summary.location_count}</td>
                       <td className="p-4 space-x-2">
-                        <button className="text-blue-600 hover:text-blue-800" onClick={() => setShowAddForm(true)}>
-                          <Plus size={16} />
+                        <button className="text-blue-600 hover:text-blue-800">
+                          <Edit2 size={16} />
                         </button>
                       </td>
                     </tr>
@@ -297,30 +234,16 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
                                   {items.map(item => (
                                     <div key={item.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
                                       <span>
-                                        📦 {item.location}
-                                        {item.harvestDate && <span className="text-gray-500 text-xs"> ({item.harvestDate})</span>}
+                                        📦 {item.location_name}
+                                        {item.harvest_date && <span className="text-gray-500 text-xs"> ({item.harvest_date})</span>}
                                       </span>
                                       <span className="font-semibold text-gray-800">{item.quantity} 件</span>
                                       <div className="space-x-1">
-                                        <button className="text-blue-600 hover:text-blue-800 text-sm" onClick={() => {
-                                          setMoveAmount(Math.min(1, item.quantity));
-                                          setMoveTarget('');
-                                          setMoveModal({ open: true, item });
-                                        }}>
-                                          <Edit2 size={18} />
+                                        <button className="text-blue-600 hover:text-blue-800 text-xs">
+                                          <Edit2 size={14} />
                                         </button>
-                                        <button className="text-red-600 hover:text-red-800 text-sm" onClick={async () => {
-                                          if (!confirm('確定要刪除此庫存項目嗎？')) return;
-                                          try {
-                                            const res = await fetch(`/api/inventory/${item.id}`, { method: 'DELETE' });
-                                            if (!res.ok) throw new Error('Delete failed');
-                                            await fetchData();
-                                            onInventoryChange?.();
-                                          } catch (e) {
-                                            alert('刪除失敗');
-                                          }
-                                        }}>
-                                          <Trash2 size={18} />
+                                        <button className="text-red-600 hover:text-red-800 text-xs">
+                                          <Trash2 size={14} />
                                         </button>
                                       </div>
                                     </div>
@@ -345,48 +268,6 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
         <div className="text-center py-12 text-gray-400">
           <Archive size={48} className="mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">暫無庫存數據</p>
-        </div>
-      )}
-
-      {/* 移動庫存彈窗 */}
-      {moveModal.open && moveModal.item && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setMoveModal({ open: false, item: null })}>
-          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">移動庫存</h3>
-            <p className="text-sm text-gray-600 mb-3">
-              {moveModal.item.productName} / {moveModal.item.grade} | 目前儲位：{moveModal.item.location} | 可用：{moveModal.item.quantity}
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">目標儲位</label>
-                <select
-                  className="w-full border rounded p-2"
-                  value={moveTarget}
-                  onChange={(e) => setMoveTarget(e.target.value)}
-                >
-                  <option value="">-- 選擇位置 --</option>
-                  {storageLocations.filter((loc: any) => loc.id !== moveModal.item?.locationId).map(loc => (
-                    <option key={loc.id} value={loc.id}>{loc.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">移動數量</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={moveModal.item.quantity}
-                  className="w-full border rounded p-2"
-                  value={moveAmount}
-                  onChange={(e) => setMoveAmount(Number(e.target.value))}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded" onClick={() => setMoveModal({ open: false, item: null })}>取消</button>
-                <button className="px-4 py-2 text-sm bg-emerald-600 text-white rounded" onClick={() => handleMoveSubmit(moveAmount, moveTarget)}>確認移動</button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>

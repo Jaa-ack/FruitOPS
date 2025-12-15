@@ -22,17 +22,21 @@ export interface FarmLog {
   // Inventory
   export interface InventoryItem {
     id: string;
-    productName: string; // e.g., "Honey Peach"
+    product_name: string; // from DB: product_name
+    productName?: string; // for backward compatibility
     grade: 'A' | 'B' | 'C';
     quantity: number; // kg or box
-    location: string; // "Cold Storage 1"
-    harvestDate: string;
+    location?: string; // "Cold Storage 1" (from storage_locations.name)
+    location_id?: string; // UUID FK to storage_locations
+    harvestDate?: string;
+    harvest_date?: string;
   }
   
   // Orders
   export interface Order {
     id: string;
-    customerName: string;
+    customerName?: string;
+    customer_name?: string; // from backend JOIN
     channel: 'Line' | 'Google Form' | 'Phone' | 'Direct' | 'Wholesale';
     items: { productName: string; grade: string; qty: number; price: number }[];
     total: number;
