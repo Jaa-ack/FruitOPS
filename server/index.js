@@ -1,4 +1,8 @@
-require('dotenv').config();
+// Only load .env automatically in non-test environments. Tests set NODE_ENV=test
+// so they can control process.env without dotenv overriding values from server/.env
+if (process.env.NODE_ENV !== 'test') {
+  require('dotenv').config();
+}
 const express = require('express');
 const bodyParser = require('body-parser');
 const rateLimit = require('express-rate-limit');
