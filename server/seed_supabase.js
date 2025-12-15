@@ -51,11 +51,25 @@ async function seed() {
     { name: 'customers', rows: customers },
   ];
 
+  // normalize row keys to lowercase to match typical Postgres column naming
+  function normalizeRows(rows) {
+    return rows.map(r => {
+      const out = {};
+      for (const k of Object.keys(r)) {
+        out[k.toLowerCase()] = r[k];
+      }
+      return out;
+    });
+  }
+
   for (const t of tables) {
     console.log('Seeding', t.name);
-    const { error } = await supabase.from(t.name).upsert(t.rows);
+    const rows = normalizeRows(t.rows);
+    const { data, error } = await supabase.from(t.name).upsert(rows);
     if (error) {
       console.error('Error seeding', t.name, error);
+    } else {
+      console.log(`Seeded ${t.name}: ${Array.isArray(data) ? data.length : 0} rows`);
     }
   }
 

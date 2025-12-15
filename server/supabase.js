@@ -26,7 +26,13 @@ async function getLogs() {
 
 async function addLog(log) {
   if (!supabase) throw new Error('Supabase not configured');
-  const { data, error } = await supabase.from('logs').insert([log]);
+  // normalize keys to lowercase to match DB column names (Postgres folds unquoted identifiers to lower case)
+  const normalized = {};
+  for (const k of Object.keys(log)) {
+    normalized[k.toLowerCase()] = log[k];
+  }
+  console.log('supabase.addLog normalized payload:', normalized);
+  const { data, error } = await supabase.from('logs').insert([normalized]);
   if (error) throw error;
   return data;
 }
