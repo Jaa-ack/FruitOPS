@@ -15,18 +15,13 @@ let supabaseClient = null;
 function getSupabaseClient() {
   if (!supabaseClient) {
     const start = Date.now();
-    // Allow forcing local DB (e.g., when Supabase is unreachable) by setting SUPABASE_FORCE_LOCAL=1
-    if (process.env.SUPABASE_FORCE_LOCAL === '1') {
-      supabaseClient = { supabase: null };
-      console.log('[Init] Forced local DB mode');
-    } else {
-      try {
-        supabaseClient = require('./supabase');
-        console.log(`[Init] Supabase module loaded in ${Date.now() - start}ms`);
-      } catch (e) {
-        console.error('[Init] Failed to load supabase module:', e.message);
-        supabaseClient = { supabase: null };
-      }
+    // Use direct REST API for better serverless performance
+    try {
+      supabaseClient = require('./supabase-direct');
+      console.log(`[Init] Direct Supabase API loaded in ${Date.now() - start}ms`);
+    } catch (e) {
+      console.error('[Init] Failed to load supabase-direct:', e.message);
+      supabaseClient = { getPlots: async () => [] }; // Fallback
     }
   }
   return supabaseClient;
@@ -139,12 +134,13 @@ async function ensureLocalDB() {
 
 app.get('/api/plots', async (req, res) => {
   try {
-    if (!getSupabaseClient().supabase) {
+    const client = getSupabaseClient();
+    if (!client || !client.getPlots) {
       if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       return res.json(db.data.plots || []);
     }
-    const rows = await getSupabaseClient().getPlots();
+    const rows = await client.getPlots();
     res.json(rows || []);
   } catch (err) {
     console.error('GET /api/plots error', err);

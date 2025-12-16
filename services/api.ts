@@ -5,7 +5,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeoutMs = 12000) {
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeoutMs = 30000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -17,7 +17,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, ti
 }
 
 export async function fetchAll(resource: string) {
-  const res = await fetchWithTimeout(`/api/${resource}`);
+  const res = await fetchWithTimeout(`/api/${resource}`, undefined, 30000);
   if (!res.ok) {
     const rid = res.headers.get('x-request-id') || undefined;
     const body = await res.text().catch(() => '');
