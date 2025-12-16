@@ -2,6 +2,8 @@
 // This avoids initialization issues that could cause timeouts in Vercel
 
 module.exports = async (req, res) => {
+  const started = Date.now();
+  try { res.setHeader('X-Api-Wrapper', 'vercel-cjs'); } catch (_) {}
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -30,7 +32,13 @@ module.exports = async (req, res) => {
     const serverless = require('serverless-http');
     const app = require('../server/index');
     const handler = serverless(app);
-    return handler(req, res);
+    const p = handler(req, res);
+    // ensure duration logged when promise settles
+    Promise.resolve(p).finally(() => {
+      try { res.setHeader('X-Handler-Duration-ms', String(Date.now() - started)); } catch (_) {}
+      console.log(`[API] ${req.method} ${req.url} → ${res.statusCode} ${Date.now() - started}ms`);
+    });
+    return p;
   } catch (err) {
     console.error('[API Error]', err.message);
     res.setHeader('Content-Type', 'application/json');

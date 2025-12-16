@@ -8,6 +8,7 @@ const bodyParser = require('body-parser');
 const { rateLimit } = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
 const { GoogleGenAI } = require('@google/genai');
+const { randomUUID } = require('crypto');
 
 // Lazy load supabaseClient to avoid blocking in serverless
 let supabaseClient = null;
@@ -21,6 +22,7 @@ function getSupabaseClient() {
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
+const REQ_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 12000);
 
 // Health check routes FIRST - ULTRA MINIMAL, no dependencies
 app.get('/', (req, res) => {
@@ -49,7 +51,28 @@ app.get('/healthz', (req, res) => {
 
 // Debug middleware - log all requests
 app.use((req, res, next) => {
-  console.log(`[DEBUG] ${req.method} ${req.path}`);
+  const start = Date.now();
+  const reqId = randomUUID();
+  res.setHeader('X-Request-Id', reqId);
+  res.locals.reqId = reqId;
+
+  let finished = false;
+  const timeout = setTimeout(() => {
+    if (finished) return;
+    console.error(`[TIMEOUT] ${req.method} ${req.path} id=${reqId} after ${Date.now() - start}ms`);
+    if (!res.headersSent) {
+      res.status(504).json({ error: 'request timeout', reqId, durationMs: Date.now() - start });
+    }
+  }, REQ_TIMEOUT_MS);
+
+  res.on('finish', () => {
+    finished = true;
+    clearTimeout(timeout);
+    console.log(`[DEBUG] ${req.method} ${req.path} → ${res.statusCode} id=${reqId} ${Date.now() - start}ms`);
+  });
+  res.on('close', () => clearTimeout(timeout));
+
+  console.log(`[DEBUG] ${req.method} ${req.path} id=${reqId}`);
   next();
 });
 
@@ -559,15 +582,110 @@ app.post('/api/ai', async (req, res) => {
     return res.json({ text: 'API Key is missing on the server. Please configure GEMINI_API_KEY.' });
   }
 
+  const withTimeout = (p, ms) => Promise.race([
+    p,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('ai-timeout')), ms))
+  ]);
+
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const fullPrompt = `你是農業營運顧問，請以繁體中文回答並保持簡潔。Context: ${context}\nUser Query: ${prompt}`;
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: fullPrompt });
-    res.json({ text: response.text || 'No response generated.' });
+    const fullPrompt = `你是農業營運顧問，請以繁體中文回答並保持簡潔。Context: ${JSON.stringify(context ?? {})}\nUser Query: ${prompt}`;
+    const started = Date.now();
+    const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 10000);
+    const result = await withTimeout(
+      ai.models.generateContent({ model: 'gemini-2.5-flash', contents: fullPrompt }),
+      timeoutMs
+    );
+    const text = (result && (result.text || result.response?.text?.())) || 'No response generated.';
+    res.set('X-External-AI-ms', String(Date.now() - started));
+    res.json({ text });
   } catch (error) {
-    console.error('AI Error:', error);
-    res.status(500).json({ text: 'AI service error' });
+    const reqId = res.getHeader('X-Request-Id');
+    console.error('AI Error:', error && error.message ? error.message : error, 'reqId=', reqId);
+    const isTimeout = String(error && error.message || '').includes('ai-timeout');
+    res.status(isTimeout ? 504 : 500).json({ text: isTimeout ? 'AI request timeout' : 'AI service error', reqId });
   }
+});
+
+// Dependencies health check
+app.get('/api/health/deps', async (req, res) => {
+  const reqId = res.getHeader('X-Request-Id');
+  const env = {
+    vercel: !!process.env.VERCEL,
+    node: process.versions.node,
+    region: process.env.VERCEL_REGION || null,
+    hasSupabaseUrl: !!process.env.SUPABASE_URL,
+    hasSupabaseKey: !!(process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY),
+    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+  };
+
+  let supabaseState = 'not-configured';
+  let supabaseMs = 0;
+  let supabaseError = null;
+  try {
+    if (getSupabaseClient().supabase) {
+      const t0 = Date.now();
+      try {
+        // light probe: try fetch one order; tolerate schema errors
+        await getSupabaseClient().getOrders().catch(e => { throw e; });
+        supabaseState = 'ok';
+      } catch (e) {
+        supabaseState = 'error';
+        supabaseError = e.message || String(e);
+      } finally {
+        supabaseMs = Date.now() - t0;
+      }
+    }
+  } catch (e) {
+    supabaseState = 'error';
+    supabaseError = e.message || String(e);
+  }
+
+  // AI reachability (network only), 2s budget
+  let aiState = env.hasGeminiKey ? 'checking' : 'not-configured';
+  let aiMs = 0;
+  let aiError = null;
+  if (env.hasGeminiKey) {
+    const t0 = Date.now();
+    try {
+      const ac = new AbortController();
+      const tid = setTimeout(() => ac.abort(), 2000);
+      // HEAD to Google API domain to verify egress
+      await fetch('https://generativelanguage.googleapis.com/', { method: 'HEAD', signal: ac.signal }).catch(() => {});
+      clearTimeout(tid);
+      aiState = 'reachable';
+    } catch (e) {
+      aiState = 'error';
+      aiError = e.message || String(e);
+    } finally {
+      aiMs = Date.now() - t0;
+    }
+  }
+
+  res.json({
+    status: 'ok',
+    reqId,
+    checks: {
+      env,
+      supabase: { state: supabaseState, ms: supabaseMs, error: supabaseError },
+      ai: { state: aiState, ms: aiMs, error: aiError },
+    },
+  });
+});
+
+// Debug config (sanitized)
+app.get('/api/debug/config', (req, res) => {
+  res.json({
+    vercel: !!process.env.VERCEL,
+    node: process.versions.node,
+    region: process.env.VERCEL_REGION || null,
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      SUPABASE_URL: process.env.SUPABASE_URL ? '[set]' : '[missing]',
+      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY ? '[set]' : (process.env.SUPABASE_KEY ? '[set]' : '[missing]'),
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY ? '[set]' : '[missing]'
+    }
+  });
 });
 
 // expose app for testing
