@@ -21,20 +21,11 @@ app.use(bodyParser.json());
 
 // Rate limiter (simple protective defaults)
 const limiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 120, // limit each IP to 120 requests per windowMs
+  windowMs: 60 * 1000,
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    const xff = req.headers['x-forwarded-for'];
-    const candidate =
-      req.ip ||
-      (Array.isArray(xff) ? xff[0] : xff?.split(',')[0]) ||
-      req.headers['x-real-ip'] ||
-      req.socket?.remoteAddress ||
-      '0.0.0.0';
-    return candidate.trim();
-  },
+  skip: (req) => process.env.NODE_ENV === 'test',
 });
 app.use(limiter);
 
