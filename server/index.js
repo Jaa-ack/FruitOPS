@@ -28,6 +28,7 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 const REQ_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 12000);
+const DISABLE_LOCAL_DB = process.env.DISABLE_LOCAL_DB === '1';
 
 // Health check routes FIRST - ULTRA MINIMAL, no dependencies
 app.get('/', (req, res) => {
@@ -128,6 +129,7 @@ async function ensureLocalDB() {
 app.get('/api/plots', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       return res.json(db.data.plots || []);
     }
@@ -142,6 +144,7 @@ app.get('/api/plots', async (req, res) => {
 app.get('/api/logs', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       return res.json(db.data.logs || []);
     }
@@ -172,6 +175,7 @@ app.post(
     const { id, date, plotId, activity, cropType, notes, cost, worker } = req.body;
     try {
       if (!getSupabaseClient().supabase) {
+        if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
         const db = await ensureLocalDB();
         db.data.logs = db.data.logs || [];
         db.data.logs.unshift({ id, date, plotId, activity, cropType, notes, cost, worker });
@@ -193,6 +197,7 @@ app.put('/api/logs/:id', async (req, res) => {
   const logData = req.body;
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       db.data.logs = db.data.logs || [];
       const idx = db.data.logs.findIndex(l => l.id === id);
@@ -213,6 +218,7 @@ app.put('/api/logs/:id', async (req, res) => {
 app.get('/api/inventory', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       return res.json(db.data.inventory || []);
     }
@@ -230,6 +236,7 @@ app.put('/api/inventory/:id', async (req, res) => {
   const { quantity } = req.body;
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       db.data.inventory = db.data.inventory || [];
       const idx = db.data.inventory.findIndex(i => i.id === id);
@@ -253,6 +260,7 @@ app.patch('/api/inventory/:id/location', async (req, res) => {
   const { location_id } = req.body;
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       db.data.inventory = db.data.inventory || [];
       const idx = db.data.inventory.findIndex(i => i.id === id);
@@ -275,6 +283,7 @@ app.delete('/api/inventory/:id', async (req, res) => {
   const { id } = req.params;
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       db.data.inventory = db.data.inventory || [];
       db.data.inventory = db.data.inventory.filter(i => i.id !== id);
@@ -340,6 +349,7 @@ app.post('/api/inventory-move', async (req, res) => {
 app.get('/api/storage-locations', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       // 無本地儲位資料，回傳空陣列
       return res.json([]);
     }
@@ -354,6 +364,7 @@ app.get('/api/storage-locations', async (req, res) => {
 app.get('/api/orders', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       const rows = db.data.orders || [];
       const mapped = rows.map(r => ({ ...r, items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items }));
@@ -403,6 +414,7 @@ app.post('/api/orders', async (req, res) => {
     };
 
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       db.data.orders = db.data.orders || [];
       db.data.orders.unshift({
@@ -432,6 +444,7 @@ app.put('/api/orders/:id', async (req, res) => {
   const { status } = req.body;
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       db.data.orders = db.data.orders || [];
       const idx = db.data.orders.findIndex(o => o.id === id);
@@ -459,6 +472,7 @@ app.post('/api/orders/:id/pick', async (req, res) => {
     }
 
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       db.data.inventory = db.data.inventory || [];
       for (const pick of picks) {
@@ -491,6 +505,7 @@ app.post('/api/orders/:id/pick', async (req, res) => {
 app.get('/api/customers', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       return res.json(db.data.customers || []);
     }
@@ -506,6 +521,7 @@ app.get('/api/customers', async (req, res) => {
 app.get('/api/inventory-summary', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       // 本地模式暫無摘要，回傳簡單彙整
       const db = await ensureLocalDB();
       const items = db.data.inventory || [];
@@ -531,6 +547,7 @@ app.get('/api/inventory-summary', async (req, res) => {
 app.get('/api/inventory-detail', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       const db = await ensureLocalDB();
       return res.json(db.data.inventory || []);
     }
@@ -546,6 +563,7 @@ app.get('/api/inventory-detail', async (req, res) => {
 app.get('/api/product-grades', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
       // 本地模式暫無設定，回傳預設
       return res.json([
         { product_name: '桃子', grades: ['A','B','C'] },
@@ -565,7 +583,7 @@ app.get('/api/product-grades', async (req, res) => {
 // 新增端點：新增或更新庫存（支持多位置）
 app.post('/api/inventory-v2', async (req, res) => {
   if (!getSupabaseClient().supabase) {
-    return res.status(503).json({ error: 'Supabase 未設定或連線失敗' });
+    return res.status(503).json({ error: DISABLE_LOCAL_DB ? 'Supabase not configured' : 'Supabase 未設定或連線失敗' });
   }
   try {
     const result = await getSupabaseClient().upsertInventoryItem(req.body);
