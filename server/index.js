@@ -349,7 +349,17 @@ app.post('/api/orders', async (req, res) => {
   }
   
   try {
-    const orderId = `ORD-${Date.now()}`;
+    // 產生結尾為 YYYYMMDD 的訂單編號，確保日期在最後
+    const tz = 'Asia/Taipei';
+    const d = new Date();
+    const parts = new Intl.DateTimeFormat('zh-TW', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(d)
+      .reduce((acc, p) => (acc[p.type] = p.value, acc), {});
+    const yyyymmdd = `${parts.year}${parts.month}${parts.day}`;
+    const prefix = (channel || 'ORD').toString().toUpperCase();
+    const unique = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const orderId = `${prefix}-${unique}-${yyyymmdd}`; // 例如: DIRECT-ABCD-20251216
+
     const orderData = {
       id: orderId,
       customer_name: customerName || '未命名客戶',

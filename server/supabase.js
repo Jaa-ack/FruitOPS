@@ -221,7 +221,20 @@ async function addOrder(orderData) {
   const normalized = toSnakeCase(orderData);
   const { id, customer_name, channel, total, status, order_items } = normalized;
 
+  // 產生或調整訂單編號：確保最後 8 碼為 YYYYMMDD
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(now)
+    .reduce((acc, p) => (acc[p.type] = p.value, acc), {});
+  const yyyymmdd = `${parts.year}${parts.month}${parts.day}`;
+  const prefix = (channel || 'ORD').toString().toUpperCase();
   let orderId = id;
+  if (!orderId) {
+    const unique = Math.random().toString(36).slice(2, 6).toUpperCase();
+    orderId = `${prefix}-${unique}-${yyyymmdd}`;
+  } else if (!orderId.endsWith(yyyymmdd)) {
+    orderId = `${orderId}-${yyyymmdd}`;
+  }
   // 嘗試用傳入的 id 插入（若 orders.id 為 TEXT 會成功）
   let ins = await sb.from('orders')
     .insert([{ id: orderId, customer_name, channel, total, status }])
