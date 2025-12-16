@@ -1,6 +1,6 @@
-// Only load .env automatically in non-test environments. Tests set NODE_ENV=test
-// so they can control process.env without dotenv overriding values from server/.env
-if (process.env.NODE_ENV !== 'test') {
+// Only load .env automatically in non-test and non-serverless environments
+// Vercel injects env vars directly into process.env, dotenv would override them with empty values
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   require('dotenv').config();
 }
 const express = require('express');
@@ -20,12 +20,22 @@ const PORT = process.env.PORT || 4000;
 app.use(bodyParser.json());
 
 // Rate limiter (simple protective defaults)
+// In serverless/proxy environments, extract IP from headers manually
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => process.env.NODE_ENV === 'test',
+  skip: (req) => process.env.NODE_ENV === 'test' || process.env.VERCEL === '1',
+  keyGenerator: (req) => {
+    // Priority: x-forwarded-for (first IP) > x-real-ip > socket remote
+    const xff = req.headers['x-forwarded-for'];
+    if (xff) {
+      const ips = xff.split(',').map(ip => ip.trim());
+      return ips[0] || 'unknown';
+    }
+    return req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+  }
 });
 app.use(limiter);
 
@@ -490,11 +500,27 @@ app.post('/api/inventory-v2', async (req, res) => {
 
 // health check
 app.get('/api/healthz', (req, res) => {
-  res.json({ status: 'ok', db: supabaseClient.supabase ? 'supabase' : 'local' });
+  res.json({ 
+    status: 'ok', 
+    db: supabaseClient.supabase ? 'supabase' : 'local',
+    env: {
+      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
+      gemini: !!process.env.GEMINI_API_KEY,
+      vercel: !!process.env.VERCEL
+    }
+  });
 });
 // 兼容舊路徑：/healthz（供測試與本機檢查）
 app.get('/healthz', (req, res) => {
-  res.json({ status: 'ok', db: supabaseClient.supabase ? 'supabase' : 'local' });
+  res.json({ 
+    status: 'ok', 
+    db: supabaseClient.supabase ? 'supabase' : 'local',
+    env: {
+      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
+      gemini: !!process.env.GEMINI_API_KEY,
+      vercel: !!process.env.VERCEL
+    }
+  });
 });
 
 // AI proxy
