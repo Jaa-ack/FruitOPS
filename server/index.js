@@ -14,11 +14,19 @@ const { randomUUID } = require('crypto');
 let supabaseClient = null;
 function getSupabaseClient() {
   if (!supabaseClient) {
+    const start = Date.now();
     // Allow forcing local DB (e.g., when Supabase is unreachable) by setting SUPABASE_FORCE_LOCAL=1
     if (process.env.SUPABASE_FORCE_LOCAL === '1') {
       supabaseClient = { supabase: null };
+      console.log('[Init] Forced local DB mode');
     } else {
-      supabaseClient = require('./supabase');
+      try {
+        supabaseClient = require('./supabase');
+        console.log(`[Init] Supabase module loaded in ${Date.now() - start}ms`);
+      } catch (e) {
+        console.error('[Init] Failed to load supabase module:', e.message);
+        supabaseClient = { supabase: null };
+      }
     }
   }
   return supabaseClient;

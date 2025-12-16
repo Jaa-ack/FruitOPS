@@ -13,6 +13,9 @@ let supabaseInitialized = false;
 function initSupabase() {
   if (supabaseInitialized) return supabase;
   
+  const start = Date.now();
+  console.log('[Supabase] Initializing client...');
+  
   if (SUPABASE_URL && SUPABASE_KEY) {
     try {
       // Inject fetch with timeout to avoid hanging lambda when Supabase is slow/unreachable
@@ -27,9 +30,12 @@ function initSupabase() {
           fetch: fetchWithTimeout
         }
       });
+      console.log(`[Supabase] Client created in ${Date.now() - start}ms`);
     } catch (e) {
-      console.error('Failed to create Supabase client:', e.message);
+      console.error('[Supabase] Failed to create client:', e.message);
     }
+  } else {
+    console.warn('[Supabase] Missing SUPABASE_URL or SUPABASE_KEY');
   }
   
   supabaseInitialized = true;
@@ -70,10 +76,19 @@ function toCamelCase(obj) {
 
 
 async function getPlots() {
-  const sb = initSupabase(); if (!sb) throw new Error('Supabase not configured');
-  const { data, error } = await sb.from('plots').select('*');
-  if (error) throw error;
-  return (data || []).map(toCamelCase);
+  const start = Date.now();
+  try {
+    const sb = initSupabase(); 
+    if (!sb) throw new Error('Supabase not configured');
+    console.log(`[getPlots] Supabase initialized in ${Date.now() - start}ms, fetching data...`);
+    const { data, error } = await sb.from('plots').select('*');
+    if (error) throw error;
+    console.log(`[getPlots] Data fetched in ${Date.now() - start}ms, ${data?.length || 0} rows`);
+    return (data || []).map(toCamelCase);
+  } catch (e) {
+    console.error(`[getPlots] Error after ${Date.now() - start}ms:`, e.message);
+    throw e;
+  }
 }
 
 async function getLogs() {
