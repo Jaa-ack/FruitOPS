@@ -17,10 +17,38 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 
+// Health check routes FIRST - before bodyParser to avoid middleware issues
+const healthResponse = () => ({
+  status: 'ok',
+  timestamp: new Date().toISOString(),
+  db: supabaseClient.supabase ? 'supabase' : 'local',
+  env: {
+    supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
+    gemini: !!process.env.GEMINI_API_KEY,
+    vercel: !!process.env.VERCEL
+  }
+});
+
+app.get('/api/healthz', (req, res) => {
+  res.set('Content-Type', 'application/json');
+  res.status(200).send(JSON.stringify(healthResponse()));
+});
+
+app.get('/healthz', (req, res) => {
+  res.set('Content-Type', 'application/json');
+  res.status(200).send(JSON.stringify(healthResponse()));
+});
+
+// Debug middleware - log all requests
+app.use((req, res, next) => {
+  console.log(`[DEBUG] ${req.method} ${req.path}`);
+  next();
+});
+
 app.use(bodyParser.json());
 
 // Rate limiter (simple protective defaults)
-// In serverless/proxy environments, extract IP from headers manually
+// In serverless/proxy environments, skip entirely to avoid undefined IP issues
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
@@ -28,13 +56,17 @@ const limiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => process.env.NODE_ENV === 'test' || process.env.VERCEL === '1',
   keyGenerator: (req) => {
-    // Priority: x-forwarded-for (first IP) > x-real-ip > socket remote
     const xff = req.headers['x-forwarded-for'];
-    if (xff) {
-      const ips = xff.split(',').map(ip => ip.trim());
-      return ips[0] || 'unknown';
+    if (xff && typeof xff === 'string') {
+      return xff.split(',')[0].trim();
     }
-    return req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+    const xri = req.headers['x-real-ip'];
+    if (xri && typeof xri === 'string') return xri.trim();
+    try {
+      return req.socket?.remoteAddress?.toString() || 'unknown';
+    } catch (e) {
+      return 'unknown';
+    }
   }
 });
 app.use(limiter);
@@ -498,30 +530,7 @@ app.post('/api/inventory-v2', async (req, res) => {
   }
 });
 
-// health check
-app.get('/api/healthz', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    db: supabaseClient.supabase ? 'supabase' : 'local',
-    env: {
-      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
-      gemini: !!process.env.GEMINI_API_KEY,
-      vercel: !!process.env.VERCEL
-    }
-  });
-});
-// 兼容舊路徑：/healthz（供測試與本機檢查）
-app.get('/healthz', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    db: supabaseClient.supabase ? 'supabase' : 'local',
-    env: {
-      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
-      gemini: !!process.env.GEMINI_API_KEY,
-      vercel: !!process.env.VERCEL
-    }
-  });
-});
+
 
 // AI proxy
 app.post('/api/ai', async (req, res) => {
