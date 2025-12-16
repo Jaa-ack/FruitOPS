@@ -27,24 +27,51 @@ module.exports = async (req, res) => {
     return;
   }
   
-  // For other endpoints, lazily load the Express app
+  // For other endpoints, lazily load the Express app with timeout protection
   try {
     const serverless = require('serverless-http');
     const app = require('../server/index');
     const handler = serverless(app);
-    const p = handler(req, res);
+    
+    // Vercel has 10s timeout for hobby tier, protect against hanging requests
+    const VERCEL_TIMEOUT = 9000; // 9s safety margin
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Function timeout protection triggered')), VERCEL_TIMEOUT);
+    });
+    
+    const handlerPromise = handler(req, res);
+    
+    // Race between handler and timeout
+    const p = Promise.race([handlerPromise, timeoutPromise])
+      .catch((err) => {
+        if (!res.headersSent) {
+          console.error('[API Timeout]', req.url, err.message);
+          res.setHeader('Content-Type', 'application/json');
+          res.status(504).end(JSON.stringify({
+            error: 'Gateway Timeout',
+            message: 'Request took too long to process',
+            hint: 'Check Supabase connection and DISABLE_LOCAL_DB env var'
+          }));
+        }
+        throw err;
+      });
+    
     // ensure duration logged when promise settles
     Promise.resolve(p).finally(() => {
       try { res.setHeader('X-Handler-Duration-ms', String(Date.now() - started)); } catch (_) {}
       console.log(`[API] ${req.method} ${req.url} → ${res.statusCode} ${Date.now() - started}ms`);
     });
+    
     return p;
   } catch (err) {
-    console.error('[API Error]', err.message);
-    res.setHeader('Content-Type', 'application/json');
-    res.status(500).end(JSON.stringify({ 
-      status: 'error', 
-      message: 'Failed to initialize API'
-    }));
+    console.error('[API Error]', err.message, err.stack);
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/json');
+      res.status(500).end(JSON.stringify({ 
+        status: 'error', 
+        message: 'Failed to initialize API',
+        details: err.message
+      }));
+    }
   }
 };
