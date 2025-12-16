@@ -377,3 +377,4 @@ MIT License - 詳見 [LICENSE](LICENSE) 檔案
 
 **需要協助？** 查看 [DB_REBUILD_GUIDE.md](./DB_REBUILD_GUIDE.md) 或提交 Issue。
 
+# Redeploy trigger
