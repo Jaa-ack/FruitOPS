@@ -57,6 +57,7 @@ const App: React.FC = () => {
   // Global State (fetched from API)
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Data State
@@ -107,11 +108,18 @@ const App: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
+    console.log('[App] Fetching data from API...');
+    const startTime = Date.now();
     Promise.all([fetchAll('plots'), fetchAll('inventory'), fetchAll('orders'), fetchAll('customers'), fetchAll('logs')])
       .then(([p, i, o, c, l]) => {
+        console.log(`[App] Data fetched successfully in ${Date.now() - startTime}ms`);
         setPlots(p); setInventory(i); setOrders(o); setCustomers(c); setLogs(l);
       })
-      .catch((err) => console.error('Fetch error', err))
+      .catch((err) => {
+        console.error('[App] Fetch error:', err);
+        setError(`無法載入資料：${err.message || '請檢查網路連線'}`);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -152,6 +160,24 @@ const App: React.FC = () => {
 
           {/* Page Content */}
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative">
+            {error && (
+              <div className="max-w-7xl mx-auto mb-4">
+                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                  <div className="flex items-start">
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">載入錯誤</h3>
+                      <p className="mt-1 text-sm text-red-700">{error}</p>
+                      <button 
+                        onClick={() => window.location.reload()} 
+                        className="mt-2 text-sm font-medium text-red-800 hover:text-red-900 underline"
+                      >
+                        重新載入頁面
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="max-w-7xl mx-auto pb-20">
               <Routes>
                 <Route path="/" element={<Dashboard orders={orders} inventory={inventory} />} />
