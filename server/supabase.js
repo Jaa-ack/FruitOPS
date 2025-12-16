@@ -3,6 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 const SUPABASE_URL = process.env.SUPABASE_URL;
 // prefer service role key for server operations if provided
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
+const SUPABASE_FETCH_TIMEOUT_MS = Number(process.env.SUPABASE_FETCH_TIMEOUT_MS || 5000);
 
 let supabase = null;
 let supabaseInitialized = false;
@@ -14,7 +15,18 @@ function initSupabase() {
   
   if (SUPABASE_URL && SUPABASE_KEY) {
     try {
-      supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+      // Inject fetch with timeout to avoid hanging lambda when Supabase is slow/unreachable
+      const fetchWithTimeout = (input, init = {}) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), SUPABASE_FETCH_TIMEOUT_MS);
+        return fetch(input, { ...init, signal: controller.signal })
+          .finally(() => clearTimeout(id));
+      };
+      supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+        global: {
+          fetch: fetchWithTimeout
+        }
+      });
     } catch (e) {
       console.error('Failed to create Supabase client:', e.message);
     }

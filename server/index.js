@@ -14,7 +14,12 @@ const { randomUUID } = require('crypto');
 let supabaseClient = null;
 function getSupabaseClient() {
   if (!supabaseClient) {
-    supabaseClient = require('./supabase');
+    // Allow forcing local DB (e.g., when Supabase is unreachable) by setting SUPABASE_FORCE_LOCAL=1
+    if (process.env.SUPABASE_FORCE_LOCAL === '1') {
+      supabaseClient = { supabase: null };
+    } else {
+      supabaseClient = require('./supabase');
+    }
   }
   return supabaseClient;
 }
