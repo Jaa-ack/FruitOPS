@@ -8,6 +8,12 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KE
 
 const FETCH_TIMEOUT_MS = Number(process.env.SUPABASE_FETCH_TIMEOUT_MS || 5000);
 
+// Flag to indicate this module is the Supabase client (for compatibility with old checks)
+const IS_CONFIGURED = !!(SUPABASE_URL && SUPABASE_KEY);
+if (IS_CONFIGURED) {
+  console.log('[DirectAPI] Supabase client initialized with REST API');
+}
+
 async function fetchSupabase(path, options = {}) {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     throw new Error('Supabase not configured');
@@ -130,6 +136,12 @@ async function addLog(log) {
 }
 
 module.exports = {
+  // Flag for compatibility with old SDK checks in server/index.js
+  // Old code checks: if (!getSupabaseClient().supabase) => use localdb
+  // This flag makes all endpoints use Supabase when configured
+  supabase: IS_CONFIGURED ? true : null,
+  
+  // All API methods
   getPlots,
   getLogs,
   getInventory,
