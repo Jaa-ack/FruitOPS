@@ -22,7 +22,15 @@ module.exports = async (req, res) => {
       status: 'ok',
       message: 'API is alive',
       environment: process.env.VERCEL ? 'vercel' : 'local',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      // Diagnostic info (without exposing full keys)
+      env_check: {
+        has_supabase_url: !!process.env.SUPABASE_URL,
+        has_supabase_key: !!process.env.SUPABASE_SERVICE_KEY,
+        has_gemini_key: !!process.env.GEMINI_API_KEY,
+        disable_local_db: process.env.DISABLE_LOCAL_DB,
+        supabase_url_prefix: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 30) : null
+      }
     }));
     return;
   }
