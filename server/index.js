@@ -18,25 +18,49 @@ app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 
 // Health check routes FIRST - before bodyParser to avoid middleware issues
-const healthResponse = () => ({
-  status: 'ok',
-  timestamp: new Date().toISOString(),
-  db: supabaseClient.supabase ? 'supabase' : 'local',
-  env: {
-    supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
-    gemini: !!process.env.GEMINI_API_KEY,
-    vercel: !!process.env.VERCEL
-  }
+app.get('/', (req, res) => {
+  const resp = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    db: supabaseClient && supabaseClient.supabase ? 'supabase' : 'local',
+    env: {
+      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
+      gemini: !!process.env.GEMINI_API_KEY,
+      vercel: !!process.env.VERCEL
+    }
+  };
+  res.set('Content-Type', 'application/json');
+  res.status(200).send(JSON.stringify(resp));
 });
 
 app.get('/api/healthz', (req, res) => {
+  const resp = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    db: supabaseClient && supabaseClient.supabase ? 'supabase' : 'local',
+    env: {
+      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
+      gemini: !!process.env.GEMINI_API_KEY,
+      vercel: !!process.env.VERCEL
+    }
+  };
   res.set('Content-Type', 'application/json');
-  res.status(200).send(JSON.stringify(healthResponse()));
+  res.status(200).send(JSON.stringify(resp));
 });
 
 app.get('/healthz', (req, res) => {
+  const resp = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    db: supabaseClient && supabaseClient.supabase ? 'supabase' : 'local',
+    env: {
+      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
+      gemini: !!process.env.GEMINI_API_KEY,
+      vercel: !!process.env.VERCEL
+    }
+  };
   res.set('Content-Type', 'application/json');
-  res.status(200).send(JSON.stringify(healthResponse()));
+  res.status(200).send(JSON.stringify(resp));
 });
 
 // Debug middleware - log all requests

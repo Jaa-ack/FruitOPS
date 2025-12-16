@@ -6,7 +6,7 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.cjs" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/healthz", "dest": "/api/index.cjs" },
+    { "src": "/.*", "dest": "/index.html" }
   ]
 }
