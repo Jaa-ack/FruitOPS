@@ -7,60 +7,44 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { rateLimit } = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
-const supabaseClient = require('./supabase');
 const { GoogleGenAI } = require('@google/genai');
 
-// initialize lowdb container when necessary (kept lazy safe)
-// call dbContainer.init() where needed
+// Lazy load supabaseClient to avoid blocking in serverless
+let supabaseClient = null;
+function getSupabaseClient() {
+  if (!supabaseClient) {
+    supabaseClient = require('./supabase');
+  }
+  return supabaseClient;
+}
 
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 
-// Health check routes FIRST - before bodyParser to avoid middleware issues
+// Health check routes FIRST - ULTRA MINIMAL, no dependencies
 app.get('/', (req, res) => {
-  const resp = {
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    db: supabaseClient && supabaseClient.supabase ? 'supabase' : 'local',
-    env: {
-      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
-      gemini: !!process.env.GEMINI_API_KEY,
-      vercel: !!process.env.VERCEL
-    }
-  };
   res.set('Content-Type', 'application/json');
-  res.status(200).send(JSON.stringify(resp));
+  res.status(200).send(JSON.stringify({
+    status: 'ok',
+    db: process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY ? 'supabase' : 'local'
+  }));
 });
 
 app.get('/api/healthz', (req, res) => {
-  const resp = {
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    db: supabaseClient && supabaseClient.supabase ? 'supabase' : 'local',
-    env: {
-      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
-      gemini: !!process.env.GEMINI_API_KEY,
-      vercel: !!process.env.VERCEL
-    }
-  };
   res.set('Content-Type', 'application/json');
-  res.status(200).send(JSON.stringify(resp));
+  res.status(200).send(JSON.stringify({
+    status: 'ok',
+    db: process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY ? 'supabase' : 'local'
+  }));
 });
 
 app.get('/healthz', (req, res) => {
-  const resp = {
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    db: supabaseClient && supabaseClient.supabase ? 'supabase' : 'local',
-    env: {
-      supabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_KEY,
-      gemini: !!process.env.GEMINI_API_KEY,
-      vercel: !!process.env.VERCEL
-    }
-  };
   res.set('Content-Type', 'application/json');
-  res.status(200).send(JSON.stringify(resp));
+  res.status(200).send(JSON.stringify({
+    status: 'ok',
+    db: process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY ? 'supabase' : 'local'
+  }));
 });
 
 // Debug middleware - log all requests
@@ -115,11 +99,11 @@ async function ensureLocalDB() {
 
 app.get('/api/plots', async (req, res) => {
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       return res.json(db.data.plots || []);
     }
-    const rows = await supabaseClient.getPlots();
+    const rows = await getSupabaseClient().getPlots();
     res.json(rows || []);
   } catch (err) {
     console.error('GET /api/plots error', err);
@@ -129,11 +113,11 @@ app.get('/api/plots', async (req, res) => {
 
 app.get('/api/logs', async (req, res) => {
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       return res.json(db.data.logs || []);
     }
-    const rows = await supabaseClient.getLogs();
+    const rows = await getSupabaseClient().getLogs();
     res.json(rows || []);
   } catch (err) {
     console.error('GET /api/logs error', err);
@@ -159,14 +143,14 @@ app.post(
     }
     const { id, date, plotId, activity, cropType, notes, cost, worker } = req.body;
     try {
-      if (!supabaseClient.supabase) {
+      if (!getSupabaseClient().supabase) {
         const db = await ensureLocalDB();
         db.data.logs = db.data.logs || [];
         db.data.logs.unshift({ id, date, plotId, activity, cropType, notes, cost, worker });
         await db.write();
         return res.status(201).json({ ok: true });
       }
-      await supabaseClient.addLog({ id, date, plotId, activity, cropType, notes, cost, worker });
+      await getSupabaseClient().addLog({ id, date, plotId, activity, cropType, notes, cost, worker });
       res.status(201).json({ ok: true });
     } catch (err) {
       console.error('POST /api/logs error', err);
@@ -180,7 +164,7 @@ app.put('/api/logs/:id', async (req, res) => {
   const { id } = req.params;
   const logData = req.body;
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       db.data.logs = db.data.logs || [];
       const idx = db.data.logs.findIndex(l => l.id === id);
@@ -190,7 +174,7 @@ app.put('/api/logs/:id', async (req, res) => {
       }
       return res.json({ ok: true });
     }
-    await supabaseClient.updateLog(id, logData);
+    await getSupabaseClient().updateLog(id, logData);
     res.json({ ok: true });
   } catch (err) {
     console.error('PUT /api/logs/:id error', err);
@@ -200,11 +184,11 @@ app.put('/api/logs/:id', async (req, res) => {
 
 app.get('/api/inventory', async (req, res) => {
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       return res.json(db.data.inventory || []);
     }
-    const rows = await supabaseClient.getInventory();
+    const rows = await getSupabaseClient().getInventory();
     res.json(rows || []);
   } catch (err) {
     console.error('GET /api/inventory error', err);
@@ -217,7 +201,7 @@ app.put('/api/inventory/:id', async (req, res) => {
   const { id } = req.params;
   const { quantity } = req.body;
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       db.data.inventory = db.data.inventory || [];
       const idx = db.data.inventory.findIndex(i => i.id === id);
@@ -227,7 +211,7 @@ app.put('/api/inventory/:id', async (req, res) => {
       }
       return res.json({ ok: true });
     }
-    await supabaseClient.updateInventoryQuantity(id, quantity);
+    await getSupabaseClient().updateInventoryQuantity(id, quantity);
     res.json({ ok: true });
   } catch (err) {
     console.error('PUT /api/inventory error', err);
@@ -240,7 +224,7 @@ app.patch('/api/inventory/:id/location', async (req, res) => {
   const { id } = req.params;
   const { location_id } = req.body;
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       db.data.inventory = db.data.inventory || [];
       const idx = db.data.inventory.findIndex(i => i.id === id);
@@ -250,7 +234,7 @@ app.patch('/api/inventory/:id/location', async (req, res) => {
       }
       return res.json({ ok: true });
     }
-    await supabaseClient.updateInventoryLocation(id, location_id);
+    await getSupabaseClient().updateInventoryLocation(id, location_id);
     res.json({ ok: true });
   } catch (err) {
     console.error('PATCH /api/inventory location error', err);
@@ -262,14 +246,14 @@ app.patch('/api/inventory/:id/location', async (req, res) => {
 app.delete('/api/inventory/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       db.data.inventory = db.data.inventory || [];
       db.data.inventory = db.data.inventory.filter(i => i.id !== id);
       await db.write();
       return res.json({ ok: true });
     }
-    await supabaseClient.deleteInventory(id);
+    await getSupabaseClient().deleteInventory(id);
     res.json({ ok: true });
   } catch (err) {
     console.error('DELETE /api/inventory/:id error', err);
@@ -284,7 +268,7 @@ app.post('/api/inventory-move', async (req, res) => {
     if (!sourceId || !targetLocationId) {
       return res.status(400).json({ error: 'sourceId 與 targetLocationId 必填' });
     }
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       db.data.inventory = db.data.inventory || [];
       const idx = db.data.inventory.findIndex(i => i.id === sourceId);
@@ -316,7 +300,7 @@ app.post('/api/inventory-move', async (req, res) => {
       await db.write();
       return res.json({ ok: true });
     }
-    await supabaseClient.moveInventory({ sourceId, targetLocationId, amount });
+    await getSupabaseClient().moveInventory({ sourceId, targetLocationId, amount });
     res.json({ ok: true });
   } catch (err) {
     console.error('POST /api/inventory-move error', err);
@@ -327,11 +311,11 @@ app.post('/api/inventory-move', async (req, res) => {
 // Get storage locations
 app.get('/api/storage-locations', async (req, res) => {
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       // 無本地儲位資料，回傳空陣列
       return res.json([]);
     }
-    const rows = await supabaseClient.getStorageLocations();
+    const rows = await getSupabaseClient().getStorageLocations();
     res.json(rows || []);
   } catch (err) {
     console.error('GET /api/storage-locations error', err);
@@ -341,13 +325,13 @@ app.get('/api/storage-locations', async (req, res) => {
 
 app.get('/api/orders', async (req, res) => {
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       const rows = db.data.orders || [];
       const mapped = rows.map(r => ({ ...r, items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items }));
       return res.json(mapped);
     }
-    const rows = await supabaseClient.getOrders();
+    const rows = await getSupabaseClient().getOrders();
     const mapped = (rows || []).map(r => ({ ...r, items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items }));
     res.json(mapped);
   } catch (err) {
@@ -380,7 +364,7 @@ app.post('/api/orders', async (req, res) => {
       }))
     };
 
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       db.data.orders = db.data.orders || [];
       db.data.orders.unshift({
@@ -396,7 +380,7 @@ app.post('/api/orders', async (req, res) => {
       return res.status(201).json({ ok: true, orderId });
     }
 
-    await supabaseClient.addOrder(orderData);
+    await getSupabaseClient().addOrder(orderData);
     res.status(201).json({ ok: true, orderId });
   } catch (err) {
     console.error('POST /api/orders error', err);
@@ -409,7 +393,7 @@ app.put('/api/orders/:id', async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       db.data.orders = db.data.orders || [];
       const idx = db.data.orders.findIndex(o => o.id === id);
@@ -419,7 +403,7 @@ app.put('/api/orders/:id', async (req, res) => {
       }
       return res.json({ ok: true });
     }
-    await supabaseClient.updateOrderStatus(id, status);
+    await getSupabaseClient().updateOrderStatus(id, status);
     res.json({ ok: true });
   } catch (err) {
     console.error('PUT /api/orders error', err);
@@ -436,7 +420,7 @@ app.post('/api/orders/:id/pick', async (req, res) => {
       return res.status(400).json({ error: 'picks 必須為非空陣列' });
     }
 
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       db.data.inventory = db.data.inventory || [];
       for (const pick of picks) {
@@ -457,8 +441,8 @@ app.post('/api/orders/:id/pick', async (req, res) => {
       return res.json({ ok: true });
     }
 
-    await supabaseClient.consumeInventory(picks);
-    await supabaseClient.updateOrderStatus(id, nextStatus);
+    await getSupabaseClient().consumeInventory(picks);
+    await getSupabaseClient().updateOrderStatus(id, nextStatus);
     res.json({ ok: true });
   } catch (err) {
     console.error('POST /api/orders/:id/pick error', err);
@@ -468,11 +452,11 @@ app.post('/api/orders/:id/pick', async (req, res) => {
 
 app.get('/api/customers', async (req, res) => {
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       return res.json(db.data.customers || []);
     }
-    const rows = await supabaseClient.getCustomers();
+    const rows = await getSupabaseClient().getCustomers();
     res.json(rows || []);
   } catch (err) {
     console.error('GET /api/customers error', err);
@@ -483,7 +467,7 @@ app.get('/api/customers', async (req, res) => {
 // 新增端點：獲取庫存摘要（按產品）
 app.get('/api/inventory-summary', async (req, res) => {
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       // 本地模式暫無摘要，回傳簡單彙整
       const db = await ensureLocalDB();
       const items = db.data.inventory || [];
@@ -497,7 +481,7 @@ app.get('/api/inventory-summary', async (req, res) => {
       }, {})).map((s) => ({ product_name: s.product_name, total_quantity: s.total_quantity, grade_count: s._grades.size, location_count: s._locs.size }));
       return res.json(summary);
     }
-    const data = await supabaseClient.getInventorySummary();
+    const data = await getSupabaseClient().getInventorySummary();
     res.json(data || []);
   } catch (err) {
     console.error('GET /api/inventory-summary error', err);
@@ -508,11 +492,11 @@ app.get('/api/inventory-summary', async (req, res) => {
 // 新增端點：獲取庫存詳細（多位置多級別）
 app.get('/api/inventory-detail', async (req, res) => {
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       const db = await ensureLocalDB();
       return res.json(db.data.inventory || []);
     }
-    const data = await supabaseClient.getInventoryV2();
+    const data = await getSupabaseClient().getInventoryV2();
     res.json(data || []);
   } catch (err) {
     console.error('GET /api/inventory-detail error', err);
@@ -523,7 +507,7 @@ app.get('/api/inventory-detail', async (req, res) => {
 // 新增端點：獲取作物品級配置
 app.get('/api/product-grades', async (req, res) => {
   try {
-    if (!supabaseClient.supabase) {
+    if (!getSupabaseClient().supabase) {
       // 本地模式暫無設定，回傳預設
       return res.json([
         { product_name: '桃子', grades: ['A','B','C'] },
@@ -532,7 +516,7 @@ app.get('/api/product-grades', async (req, res) => {
         { product_name: '蜜蘋果', grades: ['A','B','C'] }
       ]);
     }
-    const data = await supabaseClient.getProductGrades();
+    const data = await getSupabaseClient().getProductGrades();
     res.json(data || []);
   } catch (err) {
     console.error('GET /api/product-grades error', err);
@@ -542,11 +526,11 @@ app.get('/api/product-grades', async (req, res) => {
 
 // 新增端點：新增或更新庫存（支持多位置）
 app.post('/api/inventory-v2', async (req, res) => {
-  if (!supabaseClient.supabase) {
+  if (!getSupabaseClient().supabase) {
     return res.status(503).json({ error: 'Supabase 未設定或連線失敗' });
   }
   try {
-    const result = await supabaseClient.upsertInventoryItem(req.body);
+    const result = await getSupabaseClient().upsertInventoryItem(req.body);
     res.json(result);
   } catch (err) {
     console.error('POST /api/inventory-v2 error', err);
@@ -583,7 +567,8 @@ module.exports = app;
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
-    if (supabaseClient.supabase) {
+    const sc = getSupabaseClient();
+    if (sc && sc.supabase) {
       console.log('Supabase configured: using Supabase as primary DB');
     } else {
       console.log('Supabase not configured: using local lowdb (server/db.json)');

@@ -5,10 +5,30 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
 
 let supabase = null;
+let supabaseInitialized = false;
 
-if (SUPABASE_URL && SUPABASE_KEY) {
-  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Lazy initialization: only create client when first used
+function initSupabase() {
+  if (supabaseInitialized) return supabase;
+  
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    try {
+      supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    } catch (e) {
+      console.error('Failed to create Supabase client:', e.message);
+    }
+  }
+  
+  supabaseInitialized = true;
+  return supabase;
 }
+
+// Initialize on first use
+process.nextTick(() => {
+  if (!supabaseInitialized) {
+    initSupabase();
+  }
+});
 
 // ============================================================================
 // 資料轉換層：自動處理 camelCase ↔ snake_case
