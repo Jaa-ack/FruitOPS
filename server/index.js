@@ -28,7 +28,10 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 const REQ_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 12000);
-const DISABLE_LOCAL_DB = process.env.DISABLE_LOCAL_DB === '1';
+// In serverless environments (Vercel), always disable local DB fallback unless explicitly set to 0
+const DISABLE_LOCAL_DB = process.env.VERCEL 
+  ? (process.env.DISABLE_LOCAL_DB !== '0')  // Vercel: default to true unless explicitly disabled
+  : (process.env.DISABLE_LOCAL_DB === '1'); // Local: default to false unless explicitly enabled
 
 // Health check routes FIRST - ULTRA MINIMAL, no dependencies
 app.get('/', (req, res) => {
