@@ -625,12 +625,17 @@ app.get('/api/health/deps', async (req, res) => {
   try {
     if (getSupabaseClient().supabase) {
       const t0 = Date.now();
+      const timeoutMs = Number(process.env.SUPABASE_HEALTH_TIMEOUT_MS || 3000);
       try {
-        // light probe: try fetch one order; tolerate schema errors
-        await getSupabaseClient().getOrders().catch(e => { throw e; });
+        const probe = getSupabaseClient().getOrders().catch(e => { throw e; });
+        const res = await Promise.race([
+          probe,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('supabase-health-timeout')), timeoutMs))
+        ]);
+        // if resolved without throwing
         supabaseState = 'ok';
       } catch (e) {
-        supabaseState = 'error';
+        supabaseState = String(e?.message || '').includes('timeout') ? 'timeout' : 'error';
         supabaseError = e.message || String(e);
       } finally {
         supabaseMs = Date.now() - t0;
