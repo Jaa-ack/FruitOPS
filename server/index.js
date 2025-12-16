@@ -152,6 +152,43 @@ app.get('/api/plots', async (req, res) => {
   }
 });
 
+// Direct Supabase REST API test endpoint (bypasses SDK)
+app.get('/api/plots/direct', async (req, res) => {
+  try {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY;
+    if (!url || !key) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+    
+    const start = Date.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(`${url}/rest/v1/plots`, {
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeout);
+    const data = await response.json();
+    const duration = Date.now() - start;
+    
+    res.json({
+      success: true,
+      duration_ms: duration,
+      count: data.length,
+      data: data
+    });
+  } catch (err) {
+    console.error('Direct API test error:', err);
+    res.status(500).json({ error: 'Direct API failed', details: err.message });
+  }
+});
+
 app.get('/api/logs', async (req, res) => {
   try {
     if (!getSupabaseClient().supabase) {
