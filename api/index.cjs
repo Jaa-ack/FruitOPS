@@ -23,7 +23,6 @@ module.exports = async (req, res) => {
       message: 'API is alive',
       environment: process.env.VERCEL ? 'vercel' : 'local',
       timestamp: new Date().toISOString(),
-      // Diagnostic info (without exposing full keys)
       env_check: {
         has_supabase_url: !!process.env.SUPABASE_URL,
         has_supabase_key: !!process.env.SUPABASE_SERVICE_KEY,
@@ -35,51 +34,46 @@ module.exports = async (req, res) => {
     return;
   }
   
-  // For other endpoints, lazily load the Express app with timeout protection
+  // For other endpoints, lazily load the Express app
+  console.log('[API] ' + req.method + ' ' + req.url + ' starting...');
+  let handlerPromise = null;
   try {
     const serverless = require('serverless-http');
     const app = require('../server/index');
     const handler = serverless(app);
     
-    // Vercel has 10s timeout for hobby tier, protect against hanging requests
-    const VERCEL_TIMEOUT = 9000; // 9s safety margin
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Function timeout protection triggered')), VERCEL_TIMEOUT);
-    });
+    // Call handler and ensure it returns a promise
+    const result = handler(req, res);
+    handlerPromise = Promise.resolve(result);
     
-    const handlerPromise = handler(req, res);
-    
-    // Race between handler and timeout
-    const p = Promise.race([handlerPromise, timeoutPromise])
-      .catch((err) => {
-        if (!res.headersSent) {
-          console.error('[API Timeout]', req.url, err.message);
-          res.setHeader('Content-Type', 'application/json');
-          res.status(504).end(JSON.stringify({
-            error: 'Gateway Timeout',
-            message: 'Request took too long to process',
-            hint: 'Check Supabase connection and DISABLE_LOCAL_DB env var'
-          }));
-        }
-        throw err;
-      });
-    
-    // ensure duration logged when promise settles
-    Promise.resolve(p).finally(() => {
-      try { res.setHeader('X-Handler-Duration-ms', String(Date.now() - started)); } catch (_) {}
-      console.log(`[API] ${req.method} ${req.url} → ${res.statusCode} ${Date.now() - started}ms`);
-    });
-    
-    return p;
   } catch (err) {
-    console.error('[API Error]', err.message, err.stack);
+    console.error('[API Init Error]', err.message);
     if (!res.headersSent) {
       res.setHeader('Content-Type', 'application/json');
-      res.status(500).end(JSON.stringify({ 
-        status: 'error', 
-        message: 'Failed to initialize API',
-        details: err.message
-      }));
+      res.status(500).end(JSON.stringify({ error: err.message }));
     }
+    return;
   }
+  
+  // Apply timeout protection (9s for Vercel's 10s limit)
+  const VERCEL_TIMEOUT = 9000;
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('timeout')), VERCEL_TIMEOUT);
+  });
+  
+  return Promise.race([handlerPromise, timeoutPromise])
+    .catch((err) => {
+      console.error('[API Timeout]', req.url, err.message);
+      try {
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'application/json');
+          res.status(504).end(JSON.stringify({ error: 'timeout', durationMs: Date.now() - started }));
+        }
+      } catch (e) {
+        console.error('[API Error]', e.message);
+      }
+    })
+    .finally(() => {
+      console.log('[API] ' + req.method + ' ' + req.url + ' → ' + res.statusCode + ' ' + (Date.now() - started) + 'ms');
+    });
 };
