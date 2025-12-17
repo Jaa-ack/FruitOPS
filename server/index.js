@@ -135,6 +135,30 @@ async function ensureLocalDB() {
   return localDbContainer;
 }
 
+
+// DEBUG: Simple test endpoint
+app.get('/api/debug/simple', (req, res) => {
+  console.log('[DEBUG-SIMPLE] Route hit');
+  res.json({ ok: true, timestamp: Date.now() });
+});
+
+// DEBUG: Modified plots endpoint with immediate response
+app.get('/api/plots', async (req, res) => {
+  console.log('[PLOTS-DEBUG] Request START');
+  try {
+    // Return test data immediately (bypass all DB calls)
+    console.log('[PLOTS-DEBUG] Sending test response');
+    return res.json([
+      { id: 'DEBUG-1', name: 'Test Plot', status: 'Debug', timestamp: Date.now() }
+    ]);
+  } catch (err) {
+    console.error('[PLOTS-DEBUG] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ORIGINAL PLOTS ROUTE DISABLED FOR DEBUG
+/*
 app.get('/api/plots', async (req, res) => {
   try {
     const start = Date.now();
