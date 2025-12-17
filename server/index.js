@@ -136,26 +136,36 @@ async function ensureLocalDB() {
 }
 
 app.get('/api/plots', async (req, res) => {
+  const reqId = req.get('x-request-id') || 'no-id';
   try {
     const start = Date.now();
+    console.log(`[PLOTS-REQ] ${reqId} START at ${new Date().toISOString()}`);
+    console.log(`[PLOTS-REQ] ${reqId} SUPABASE_READY=${SUPABASE_READY}, DISABLE_LOCAL_DB=${DISABLE_LOCAL_DB}`);
+    
     if (!SUPABASE_READY) {
-      console.log('[DEBUG /api/plots] Supabase not configured, checking local DB');
+      console.log(`[PLOTS-REQ] ${reqId} Using local DB fallback`);
       if (DISABLE_LOCAL_DB) {
+        console.log(`[PLOTS-REQ] ${reqId} ERROR: Local DB disabled and Supabase not ready`);
         return res.status(503).json({ error: 'Supabase not configured and local DB disabled' });
       }
       const db = await ensureLocalDB();
       const data = db.data.plots || [];
-      console.log(`[DEBUG /api/plots] Returned ${data.length} plots from local DB in ${Date.now() - start}ms`);
+      const elapsed = Date.now() - start;
+      console.log(`[PLOTS-REQ] ${reqId} Response: ${data.length} plots from local DB in ${elapsed}ms`);
       return res.json(data);
     }
     
+    console.log(`[PLOTS-REQ] ${reqId} Fetching from Supabase API...`);
     const client = getSupabaseClient();
     const rows = await client.getPlots();
-    console.log(`[DEBUG /api/plots] Returned ${rows ? rows.length : 0} plots from Supabase in ${Date.now() - start}ms`);
+    const elapsed = Date.now() - start;
+    console.log(`[PLOTS-REQ] ${reqId} Response: ${rows ? rows.length : 0} plots from Supabase in ${elapsed}ms`);
     res.json(rows || []);
   } catch (err) {
-    console.error('GET /api/plots error', err.message);
-    res.status(500).json({ error: '取得 plots 失敗', details: err.message });
+    const elapsed = Date.now() - start;
+    console.error(`[PLOTS-ERROR] ${reqId} Exception after ${elapsed}ms: ${err.message}`);
+    console.error(`[PLOTS-ERROR] ${reqId} Stack:`, err.stack);
+    res.status(500).json({ error: '取得 plots 失敗', details: err.message, reqId });
   }
 });
 
