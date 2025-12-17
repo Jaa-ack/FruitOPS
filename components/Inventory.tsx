@@ -52,7 +52,17 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
         fetch('/api/product-grades')
       ]);
 
-      if (summaryRes.ok) setSummarySummary(await summaryRes.json());
+      if (summaryRes.ok) {
+        const summaryRaw = await summaryRes.json();
+        // Normalize snake_case -> camelCase for UI consumption
+        const summary = Array.isArray(summaryRaw) ? summaryRaw.map((row: any) => ({
+          productName: row.productName ?? row.product_name,
+          totalQuantity: row.totalQuantity ?? row.total_quantity ?? 0,
+          gradeCount: row.gradeCount ?? row.grade_count ?? 0,
+          locationCount: row.locationCount ?? row.location_count ?? 0,
+        })) : [];
+        setSummarySummary(summary);
+      }
       if (detailRes.ok) setDetailData(await detailRes.json());
       if (locRes.ok) setStorageLocations(await locRes.json());
       if (gradesRes.ok) {
