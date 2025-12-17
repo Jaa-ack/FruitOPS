@@ -1,0 +1,23 @@
+--- a/server/index.js
++++ b/server/index.js
+@@ -135,6 +135,15 @@ let localDbContainer = null;
+   return localDbContainer;
+ }
+ 
++// DEBUG: Ultra-simple endpoint to test if Express routes work at all
++app.get('/api/debug/simple', (req, res) => {
++  console.log('[DEBUG-SIMPLE] Called');
++  res.json({ ok: true, ts: Date.now(), msg: 'Express route works' });
++});
++
++// DEBUG: Test plots with fake data (no DB call)
+ app.get('/api/plots', async (req, res) => {
++  console.log('[PLOTS-START] Request received');
+   try {
+-    const start = Date.now();
++    // TEMP: Return fake data immediately to test if route works
++    console.log('[PLOTS-FAKE] Returning test data');
++    return res.json([{ id: 'TEST', name: 'Debug Plot', test: true }]);
++    
++    /* Original code - temporarily disabled
++    const start = Date.now();
