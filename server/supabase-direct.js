@@ -295,19 +295,42 @@ async function getProductGrades() {
 }
 
 async function upsertInventoryItem(inventoryData) {
-  // Insert or update inventory item
+  // Insert or update inventory item by (product_name, grade, location_id)
   const normalized = toSnakeCase(inventoryData);
-  
-  // Use upsert: update if exists, insert if not
-  const data = await fetchSupabase('/inventory', {
+  const productName = normalized.product_name;
+  const grade = normalized.grade || 'A';
+  const locationId = normalized.location_id;
+  const addQty = Number(normalized.quantity || 0);
+
+  if (!productName || !locationId) {
+    throw new Error('upsertInventoryItem requires productName and locationId');
+  }
+
+  // Find existing item with same product/grade/location
+  const existing = await fetchSupabase(
+    `/inventory?product_name=eq.${encodeURIComponent(productName)}&grade=eq.${encodeURIComponent(grade)}&location_id=eq.${encodeURIComponent(locationId)}&select=id,quantity`
+  );
+
+  if (existing && existing.length > 0) {
+    const current = existing[0];
+    const newQty = (Number(current.quantity) || 0) + addQty;
+    await updateInventoryQuantity(current.id, newQty);
+    return { id: current.id, productName, grade, quantity: newQty, locationId };
+  }
+
+  // Otherwise, create new item and return representation
+  const created = await fetchSupabase('/inventory', {
     method: 'POST',
-    body: JSON.stringify(normalized),
-    headers: {
-      'Prefer': 'resolution=merge-duplicates'
-    }
+    body: JSON.stringify({
+      product_name: productName,
+      grade,
+      quantity: addQty,
+      location_id: locationId,
+      harvest_date: normalized.harvest_date
+    })
   });
-  
-  return data[0] ? toCamelCase(data[0]) : null;
+
+  return created[0] ? toCamelCase(created[0]) : null;
 }
 
 async function moveInventory({ sourceId, targetLocationId, amount }) {
