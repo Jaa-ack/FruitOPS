@@ -17,56 +17,52 @@ module.exports = async (req, res) => {
   // Health check - no Express load needed
   if (req.url === '/' || req.url === '/api/healthz' || req.url === '/healthz') {
     res.setHeader('Content-Type', 'application/json');
-    return res.status(200).end(JSON.stringify({
+    const response = JSON.stringify({
       status: 'ok',
       timestamp: new Date().toISOString(),
       env: {
         supabase: !!process.env.SUPABASE_URL,
         gemini: !!process.env.GEMINI_API_KEY
       }
-    }));
+    });
+    res.setHeader('Content-Length', Buffer.byteLength(response));
+    return res.status(200).end(response);
   }
   
   // For all other routes, load Express
-  console.log(`[API] ${req.method} ${req.url}`);
+  console.log(`[HANDLER] ${req.method} ${req.url} START`);
   
   try {
     const serverless = require('serverless-http');
     const app = require('../server/index');
     
-    // Create handler
+    // Create handler with explicit basePath
     const handler = serverless(app, { 
-      // Force async mode to ensure proper promise handling
-      basePath: '' 
+      basePath: ''
     });
     
-    // Wrap in timeout: 8s max (Vercel limit is 10s)
-    const result = await Promise.race([
-      handler(req, res),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Handler timeout after 8s')), 8000)
-      )
-    ]);
+    // Simple await - no Promise.race complexity
+    // serverless-http returns a Promise that resolves when response is sent
+    console.log(`[HANDLER] Loading Express app and calling handler...`);
+    await handler(req, res);
+    console.log(`[HANDLER] ${req.method} ${req.url} DONE in ${Date.now() - started}ms`);
     
-    console.log(`[API] ${req.method} ${req.url} completed in ${Date.now() - started}ms`);
-    return result;
+    // Response already sent by handler, don't return anything
+    return;
     
   } catch (error) {
-    console.error(`[API ERROR] ${error.message} at ${Date.now() - started}ms`);
+    console.error(`[HANDLER ERROR] ${error.message} at ${Date.now() - started}ms`, error.stack);
     
     // Only send response if headers not yet sent
     if (!res.headersSent) {
       res.setHeader('Content-Type', 'application/json');
       const status = error.message.includes('timeout') ? 504 : 500;
-      return res.status(status).json({
+      const response = JSON.stringify({
         error: error.message,
-        path: req.url,
-        durationMs: Date.now() - started
+        timestamp: new Date().toISOString()
       });
+      res.setHeader('Content-Length', Buffer.byteLength(response));
+      return res.status(status).end(response);
     }
-    
-    // If headers already sent, just log and exit
-    console.error(`[API] Headers already sent when error occurred`);
-    return;
   }
 };
