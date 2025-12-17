@@ -1,18 +1,26 @@
 # 🍎 FruitOPS - 果園管理系統
 
-完整的果園營運管理系統，支援果園地塊管理、農事日誌、庫存追蹤與訂單管理。
+完整的果園營運管理系統，支援果園地塊管理、農事日誌、分級庫存與訂單管理，並提供決策建議與 AI 顧問。
+
+線上展示（Vercel 部署）：
+
+- 前台網站：https://fruit-ops.vercel.app
+- 健康檢查：https://fruit-ops.vercel.app/api/healthz
 
 ![FruitOPS Banner](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
 
 ## ✨ 功能特色
 
-- 📊 **儀表板** - 營運數據總覽、收入趨勢分析
-- 🌳 **果園管理** - 地塊資訊、作物健康追蹤
-- 📝 **農事日誌** - 完整記錄所有農事活動與成本
-- 📦 **庫存管理** - 多位置、多品級庫存即時追蹤，支援庫存移位
-- 🛒 **訂單管理** - 客戶訂單、揀貨/扣庫存與狀態追蹤
-- 👥 **客戶關係** - CRM 功能、客戶分級管理
-- 🤖 **AI 顧問** - Google Gemini 支援的智能建議
+- 🧠 **今日決策建議** - 首頁頂部提供可操作建議（補貨、訂單優先、儲位調整、銷售推進），一進來就知道該做什麼
+- 📊 **儀表板** - 通路分佈、庫存水位圖、庫存管理細節建議
+- 🌳 **果園管理** - 地塊資訊、作物健康追蹤、農事日誌
+- 📝 **農事日誌** - 記錄活動、成本、工時，快速新增與查詢
+- 📦 **分級庫存** - 多位置、多品級庫存管理，支援移位、彙總
+- 🛒 **訂單管理** - 建單、揀貨扣庫存、狀態流轉（Pending/Confirmed/Completed）
+- 👥 **客戶關係** - CRM 與客戶分群
+- 🤖 **AI 顧問** - Google Gemini 智能回答（可選）
+
+---
 
 ## 🚀 快速開始
 
@@ -102,6 +110,8 @@ npm run dev:server  # 後端 (port 4000)
 
 前往 http://localhost:3000 開始使用！
 
+---
+
 ## 📦 技術架構
 
 ### 前端技術棧
@@ -112,10 +122,10 @@ npm run dev:server  # 後端 (port 4000)
 - React Router（路由）
 
 ### 後端技術棧
-- Node.js + Express
-- Supabase（PostgreSQL + PostgREST）
-- Google Gemini AI
-- serverless-http（Vercel 部署）
+- Node.js + Express（在 Vercel 以 Serverless Function 執行）
+- Supabase（PostgreSQL + PostgREST）— 已改為「直接 REST 客戶端」，避免 SDK 冷啟動延遲
+- Google Gemini AI（可選）
+- 逾時與健康檢查：`/api/healthz`、明確超時處理
 
 ## 📁 專案結構
 
@@ -130,7 +140,7 @@ FruitOPS/
 │   └── GeminiAdvisor.tsx    # AI 顧問
 ├── server/                  # 後端服務
 │   ├── index.js             # Express 主程式
-│   ├── supabase.js          # 資料層（含自動轉換）
+│   ├── supabase-direct.js   # 直連 Supabase REST（內建 camel/snake 轉換、POST/PATCH Prefer header）
 │   ├── migrations/          # SQL 遷移檔案
 │   │   └── 002_rebuild_with_sample_data.sql
 │   └── .env                 # 環境變數（需自行建立）
@@ -165,7 +175,7 @@ npm run preview          # 預覽建置結果
 - **訂單建立**：訂單頁「快速新增訂單」支援多品項，總額會自動加總，送出寫入 `/api/orders`。
 - **訂單揀貨與確認**：訂單行點「揀貨/扣庫存」，每個品項需選擇來源儲位且數量必須與需求完全相同，成功後 `/api/orders/:id/pick` 會扣庫存並將訂單狀態改為 Confirmed。
 
-## 📊 資料庫說明
+## 📊 資料庫與 API 說明
 
 ### 核心資料表
 
@@ -180,7 +190,7 @@ npm run preview          # 預覽建置結果
 | `product_grades` | 品級配置 | id, product_name, grades[] |
 | `storage_locations` | 儲位 | id, name, type, capacity |
 
-### 主要 API 對照
+### 主要 API 對照（部分）
 
 - `GET /api/inventory-summary` / `GET /api/inventory-detail`：多位置庫存摘要與明細。
 - `POST /api/inventory-v2`：新增/更新庫存，支援同品項多位置。
@@ -188,7 +198,7 @@ npm run preview          # 預覽建置結果
 - `POST /api/orders`：建立訂單（多品項）。
 - `POST /api/orders/:id/pick`：揀貨扣庫存並更新訂單狀態。
 
-### 自動欄位轉換
+### 自動欄位轉換（camelCase ↔ snake_case）
 
 資料庫使用 **snake_case**（PostgreSQL 標準），前端使用 **camelCase**。轉換層自動處理，無需手動轉換：
 
@@ -212,6 +222,8 @@ npm run preview          # 預覽建置結果
 | 柿子 | A, B（只有兩級）|
 
 前端訂單介面會動態載入品級選項，依水果顯示對應等級。
+
+---
 
 ## 🚀 部署到 Vercel
 
@@ -250,7 +262,7 @@ Vercel 會直接注入環境變數，請在 Vercel Dashboard → Project Setting
 6. **測試功能**  
    登入前端，測試新增訂單、庫存、日誌等功能確保 Supabase 連線正常
 
-### 架構說明
+### 架構說明（Vercel）
 
 - 前端：Vite 建置為靜態檔案，部署於 Vercel CDN
 - 後端：Express 透過 `serverless-http` 包裝為 Vercel Serverless Function（`api/index.cjs`）
@@ -260,7 +272,7 @@ Vercel 會直接注入環境變數，請在 Vercel Dashboard → Project Setting
 ### 故障排查
 
 **Q: 部署後 API 無回應或逾時**  
-A: 檢查 Vercel Function Logs，確認環境變數正確設定，特別是 `DISABLE_LOCAL_DB=1` 以避免嘗試本地 fallback
+A: 檢查 Vercel Function Logs，確認環境變數正確設定。專案已去除多餘包裝，直接以 Express app 回應，避免 handler 掛起問題。
 
 **Q: 前端顯示「無法連線到伺服器」**  
 A: 確認 API 路徑正確（Vite proxy 在本地開發時有效，生產環境前端直接呼叫 `/api/*`）
@@ -308,11 +320,11 @@ A:
 - 驗證 SUPABASE_URL 和 SUPABASE_SERVICE_KEY 正確
 - 確認 Supabase 專案狀態正常（沒有暫停）
 
-**Q: AI 功能回應 503 UNAVAILABLE**  
+**Q: AI 功能回應 403/超時**  
 A:
-- 這通常是 Google Gemini API 暫時過載，稍後重試即可
-- 確認 `GEMINI_API_KEY` 已設定且有效
-- 檢查 API 配額未超過限制
+- 403 常見於金鑰無效或被判定外洩，請於 Google AI Studio 重新產生
+- 未設定金鑰時，系統會回傳可讀錯誤（不影響其他功能）
+- 逾時可調整 `AI_TIMEOUT_MS`
 
 ### Vercel 部署
 
@@ -345,6 +357,7 @@ A:
 ⚠️ **重要：保護你的密鑰**
 
 - 永遠不要將 `.env` 檔案 commit 到 Git（已加入 `.gitignore`）
+- 不要在文件中填入真實 API Key（以說明文字取代）
 - 使用 `SUPABASE_SERVICE_KEY` 時需特別小心（具有完整權限）
 - 生產環境建議使用 Supabase RLS（Row Level Security）限制資料存取
 - 部署時使用平台的 Environment Variables 功能，避免硬編碼密鑰
