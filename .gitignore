@@ -24,3 +24,5 @@ server/.env
 *.njsproj
 *.sln
 *.sw?
+# Environment variable documentation (may contain sensitive info)
+check-vercel-env.md
