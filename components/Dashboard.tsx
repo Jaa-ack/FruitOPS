@@ -1,7 +1,8 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { DashboardMetrics, Order, InventoryItem } from '../types';
-import { DollarSign, Package, AlertTriangle, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, PackageOpen, ShoppingBasket, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface DashboardProps {
   orders: Order[];
@@ -29,12 +30,18 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
   const revenue = orders.reduce((acc, curr) => acc + curr.total, 0);
   const pendingOrders = orders.filter(o => o.status === 'Pending').length;
   const lowStockItems = safeInventory.filter(i => i.quantity < 50).length;
+  const topChannel = (() => {
+    const counts: Record<string, number> = {};
+    orders.forEach(o => { counts[o.channel] = (counts[o.channel] || 0) + 1; });
+    const entries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+    return entries.length ? entries[0][0] : 'Direct';
+  })();
   
   const metrics: DashboardMetrics = {
     revenue,
     ordersPending: pendingOrders,
     lowStockItems,
-    topCrop: '蜜桃' // Simplified for mock, translated to Chinese
+    topCrop: '蜜桃'
   };
 
   // Chart Data Preparation
@@ -97,44 +104,81 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
-          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-full mr-4">
-            <DollarSign size={24} />
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">季總營收</p>
-            <p className="text-2xl font-bold text-gray-800">NT$ {metrics.revenue.toLocaleString()}</p>
-          </div>
+      {/* 今日決策建議 */}
+      <div className="bg-gradient-to-r from-emerald-50 via-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <TrendingUp size={18} className="text-emerald-600" /> 今日決策建議
+          </h3>
+          <span className="text-xs text-gray-500">即時根據庫存與訂單生成</span>
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 補貨建議 */}
+          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-2 text-emerald-700">
+              <ShoppingBasket size={18} />
+              <span className="text-sm font-semibold">補貨建議</span>
+            </div>
+            <p className="text-sm text-gray-700">
+              低庫存：<b>{lowStockItems}</b> 項
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              建議優先補貨：{safeInventory.filter(i=>i.quantity<50).slice(0,3).map(i=>i.productName||i.product_name).join('、') || '—'}
+            </p>
+            <div className="mt-3">
+              <Link to="/inventory" className="text-xs text-emerald-700 hover:text-emerald-800 underline">前往分級庫存</Link>
+            </div>
+          </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-full mr-4">
-            <Package size={24} />
+          {/* 訂單優先處理 */}
+          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-2 text-blue-700">
+              <ClipboardCheck size={18} />
+              <span className="text-sm font-semibold">訂單優先處理</span>
+            </div>
+            <p className="text-sm text-gray-700">
+              待處理：<b>{pendingOrders}</b> 筆
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              建議先處理最近 24h 的新訂單，以降低等待時間。
+            </p>
+            <div className="mt-3">
+              <Link to="/orders" className="text-xs text-blue-700 hover:text-blue-800 underline">前往訂單管理</Link>
+            </div>
           </div>
-          <div>
-            <p className="text-sm text-gray-500">待處理訂單</p>
-            <p className="text-2xl font-bold text-gray-800">{metrics.ordersPending}</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
-          <div className="p-3 bg-yellow-100 text-yellow-600 rounded-full mr-4">
-            <AlertTriangle size={24} />
+          {/* 儲位調整 */}
+          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-2 text-orange-700">
+              <PackageOpen size={18} />
+              <span className="text-sm font-semibold">儲位調整</span>
+            </div>
+            <p className="text-sm text-gray-700">
+              高庫存：<b>{highStockProducts.length}</b> 項
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              建議移至冷藏或促銷降低庫存壓力。
+            </p>
+            <div className="mt-3">
+              <Link to="/inventory" className="text-xs text-orange-700 hover:text-orange-800 underline">前往庫存管理</Link>
+            </div>
           </div>
-          <div>
-            <p className="text-sm text-gray-500">庫存預警</p>
-            <p className="text-2xl font-bold text-gray-800">{metrics.lowStockItems}</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
-          <div className="p-3 bg-purple-100 text-purple-600 rounded-full mr-4">
-            <TrendingUp size={24} />
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">主力作物</p>
-            <p className="text-xl font-bold text-gray-800">{metrics.topCrop}</p>
+          {/* 銷售推進 */}
+          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-2 text-purple-700">
+              <TrendingUp size={18} />
+              <span className="text-sm font-semibold">銷售推進</span>
+            </div>
+            <p className="text-sm text-gray-700">
+              近況：<b>{channelDisplay(topChannel)}</b> 通路表現最佳
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              建議在 {channelDisplay(topChannel)} 推出促銷組合以提升轉單率。
+            </p>
+            <div className="mt-3">
+              <Link to="/orders" className="text-xs text-purple-700 hover:text-purple-800 underline">前往訂單管理</Link>
+            </div>
           </div>
         </div>
       </div>
@@ -190,11 +234,11 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
         </div>
       </div>
 
-      {/* 庫存決策建議 */}
+      {/* 庫存決策細節 */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm border border-blue-100">
         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
           <AlertTriangle size={20} className="text-blue-600" />
-          庫存管理決策建議
+          庫存管理細節建議
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {inventoryInsights.map((insight, idx) => (
