@@ -689,9 +689,23 @@ app.post('/api/ai', async (req, res) => {
     res.json({ text });
   } catch (error) {
     const reqId = res.getHeader('X-Request-Id');
-    console.error('AI Error:', error && error.message ? error.message : error, 'reqId=', reqId);
-    const isTimeout = String(error && error.message || '').includes('ai-timeout');
-    res.status(isTimeout ? 504 : 500).json({ text: isTimeout ? 'AI request timeout' : 'AI service error', reqId });
+    const errorMsg = error && error.message ? error.message : String(error);
+    console.error('AI Error:', errorMsg, 'reqId=', reqId);
+    
+    // Check if API key is invalid or leaked
+    if (errorMsg.includes('403') || errorMsg.includes('PERMISSION_DENIED') || errorMsg.includes('leaked')) {
+      return res.status(403).json({
+        text: 'Gemini API key is invalid or has been reported as leaked. Please update GEMINI_API_KEY in Vercel environment variables.',
+        reqId
+      });
+    }
+    
+    const isTimeout = errorMsg.includes('ai-timeout');
+    res.status(isTimeout ? 504 : 500).json({ 
+      text: isTimeout ? 'AI request timeout' : 'AI service error',
+      error: errorMsg,
+      reqId 
+    });
   }
 });
 

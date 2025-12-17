@@ -30,6 +30,8 @@ async function fetchSupabase(path, options = {}) {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json',
+        // For POST/PATCH, request returned data for confirmation
+        'Prefer': options.method === 'POST' || options.method === 'PATCH' ? 'return=representation' : 'return=minimal',
         ...options.headers
       },
       signal: controller.signal
@@ -38,6 +40,12 @@ async function fetchSupabase(path, options = {}) {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Supabase API error: ${response.status} ${error}`);
+    }
+
+    // For some requests (especially DELETE), there's no response body
+    const contentLength = response.headers.get('content-length');
+    if (contentLength === '0' || !response.body) {
+      return [];
     }
 
     return response.json();
