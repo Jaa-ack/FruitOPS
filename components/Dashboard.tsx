@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { DashboardMetrics, Order, InventoryItem } from '../types';
-import { AlertTriangle, ClipboardCheck, PackageOpen, ShoppingBasket, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, PackageOpen, ShoppingBasket, TrendingUp, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import ProductionCalendar from './ProductionCalendar';
+import { getAvailableFruitsByMonth } from '../types/fruitCycle';
 
 interface DashboardProps {
   orders: Order[];
@@ -12,6 +14,11 @@ interface DashboardProps {
 const COLORS = ['#22c55e', '#eab308', '#ef4444', '#3b82f6'];
 
 const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
+  const [showCalendar, setShowCalendar] = useState(false);
+
+  // 取得當前月份
+  const currentMonth = new Date().getMonth() + 1;
+  const availableFruits = getAvailableFruitsByMonth(currentMonth);
   const safeInventory: InventoryItem[] = Array.isArray(inventory)
     ? inventory.map((i, idx) => ({
         id: (i as any).id || `inv-${idx}`,
@@ -104,6 +111,37 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* 季節狀況提示 */}
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-lg border border-amber-200 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Calendar className="w-5 h-5 text-amber-600" />
+            <div>
+              <h3 className="font-semibold text-amber-900">📅 {currentMonth}月季節狀況</h3>
+              <p className="text-sm text-amber-700">
+                {availableFruits.length > 0
+                  ? `可銷售水果：${availableFruits.map(f => f.cnName).join('、')}`
+                  : '無新鮮水果在季，依靠冷藏庫存銷售'
+                }
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowCalendar(!showCalendar)}
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-semibold"
+          >
+            {showCalendar ? '隱藏' : '查看'} 行事曆
+          </button>
+        </div>
+      </div>
+
+      {/* 展開的行事曆 */}
+      {showCalendar && (
+        <div className="border border-gray-200 rounded-lg overflow-hidden shadow-lg">
+          <ProductionCalendar />
+        </div>
+      )}
+
       {/* 今日決策建議 */}
       <div className="bg-gradient-to-r from-emerald-50 via-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm border border-gray-200">
         <div className="flex items-center justify-between mb-4">
@@ -123,7 +161,12 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
               低庫存：<b>{lowStockItems}</b> 項
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              建議優先補貨：{safeInventory.filter(i=>i.quantity<50).slice(0,3).map(i=>i.productName||i.product_name).join('、') || '—'}
+              {availableFruits.length > 0
+                ? `當月在季水果優先補貨：${availableFruits.map(f => f.cnName).join('、')}`
+                : '淡季依靠冷藏庫存，建議優先銷售臨期品'}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              其他補貨：{safeInventory.filter(i=>i.quantity<50).slice(0,3).map(i=>i.productName||i.product_name).join('、') || '—'}
             </p>
             <div className="mt-3">
               <Link to="/inventory" className="text-xs text-emerald-700 hover:text-emerald-800 underline">前往分級庫存</Link>
