@@ -364,25 +364,72 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
         </div>
       </div>
 
-      {/* 庫存決策細節（自 Dashboard 移入） */}
+      {/* 庫存決策細節（自 Dashboard 移入，重新設計為時效與通路策略） */}
       {(() => {
         const totalInventory = (summarySummary || []).reduce((sum, s) => sum + (Number(s.totalQuantity) || 0), 0);
         const avgStock = (summarySummary || []).length > 0 ? Math.round(totalInventory / summarySummary.length) : 0;
-        const lowStockProducts = (detailData || []).filter(d => (Number(d.quantity) || 0) < 50);
-        const highStockProducts = (detailData || []).filter(d => (Number(d.quantity) || 0) > 200);
+        
+        // 計算時效分析（依據 harvest_date）
+        const now = new Date();
+        const freshItems = (detailData || []).filter(d => {
+          if (!d.harvestDate) return false;
+          const harvestDate = new Date(d.harvestDate);
+          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
+          return agingDays <= 7;
+        });
+        const preservationItems = (detailData || []).filter(d => {
+          if (!d.harvestDate) return false;
+          const harvestDate = new Date(d.harvestDate);
+          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
+          return agingDays > 7 && agingDays <= 14;
+        });
+        const displayItems = (detailData || []).filter(d => {
+          if (!d.harvestDate) return false;
+          const harvestDate = new Date(d.harvestDate);
+          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
+          return agingDays > 14;
+        });
+        
+        const freshQty = freshItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+        const preservationQty = preservationItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+        const displayQty = displayItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+        
         const insights = [
-          { label: '總庫存量', value: `${totalInventory} 單位`, color: 'text-blue-600', advice: totalInventory < 500 ? '庫存偏低，建議規劃補貨' : '庫存充足' },
-          { label: '平均庫存', value: `${avgStock} 單位/品項`, color: 'text-green-600', advice: avgStock < 50 ? '平均庫存偏低' : '庫存分佈健康' },
-          { label: '低庫存商品', value: `${lowStockProducts.length} 項`, color: lowStockProducts.length > 0 ? 'text-orange-600' : 'text-gray-600', advice: lowStockProducts.length > 0 ? '需要優先補貨' : '無急迫缺貨風險' },
-          { label: '高庫存商品', value: `${highStockProducts.length} 項`, color: highStockProducts.length > 3 ? 'text-purple-600' : 'text-gray-600', advice: highStockProducts.length > 3 ? '考慮促銷降低庫存' : '庫存控制良好' }
+          { 
+            label: '新鮮期庫存（≤7天）', 
+            value: `${freshQty} 單位`, 
+            color: 'text-green-600',
+            advice: freshQty > 0 ? '優先配給 Direct/Line 通路，主打 A/B 級品' : '無新鮮採收，依靠冷藏庫存'
+          },
+          { 
+            label: '保鮮期庫存（8-14天）', 
+            value: `${preservationQty} 單位`, 
+            color: 'text-blue-600',
+            advice: preservationQty > 0 ? '適合 Phone/Wholesale 通路，推薦組合銷售' : '無保鮮期庫存'
+          },
+          { 
+            label: '展示期庫存（>14天）', 
+            value: `${displayQty} 單位`, 
+            color: displayQty > 100 ? 'text-orange-600' : 'text-gray-600',
+            advice: displayQty > 100 ? '進入臨期，建議促銷或加工通路處理' : displayQty > 0 ? '少量臨期品，可用於樣品展示' : '無臨期品'
+          },
+          { 
+            label: '平均庫存/品項', 
+            value: `${avgStock} 單位`, 
+            color: 'text-purple-600',
+            advice: avgStock < 30 ? '品項庫存偏低，關注採收計畫' : '庫存分佈健康'
+          }
         ];
         return (
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm border border-blue-100">
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-xl shadow-sm border border-emerald-100">
             <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <AlertTriangle size={20} className="text-blue-600" />
-              庫存管理細節建議
+              <AlertTriangle size={20} className="text-emerald-600" />
+              庫存時效與通路配置建議
             </h3>
-            <p className="text-xs text-gray-600 mb-4">依據：低庫存閾值 &lt;50、高庫存閾值 &gt;200；平均庫存 = 總庫存 / 品項數。</p>
+            <p className="text-xs text-gray-600 mb-4">
+              依據：採收日期（harvest_date）計算時效分期（新鮮期 ≤7天、保鮮期 8-14天、展示期 &gt;14天），結合通路特性建議配置。
+              <br/><b>通路建議</b>：Direct/Line 優先新鮮期 A/B 級；Phone/Wholesale 適合保鮮期組合；展示期建議促銷或加工。
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {insights.map((ins, idx) => (
                 <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -394,17 +441,20 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
                 </div>
               ))}
             </div>
-            <div className="mt-4 bg-white p-4 rounded-lg border border-blue-200">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">智慧補貨建議</h4>
+            <div className="mt-4 bg-white p-4 rounded-lg border border-emerald-200">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">本週執行建議</h4>
               <div className="space-y-1 text-xs text-gray-600">
-                {lowStockProducts.length > 0 && (
-                  <p>• 優先補貨：{lowStockProducts.slice(0, 3).map(p => p.productName).join('、')}{lowStockProducts.length > 3 ? ` 等 ${lowStockProducts.length} 項` : ''}</p>
+                {freshQty > 0 && (
+                  <p>• <b>新鮮期優先</b>：將 {freshItems.slice(0,3).map(i=>i.productName).join('、')} 等新鮮品優先配給 Direct/Line 通路</p>
                 )}
-                {highStockProducts.length > 0 && (
-                  <p>• 庫存過高：{highStockProducts.slice(0, 3).map(p => p.productName).join('、')} 可考慮促銷</p>
+                {preservationQty > 100 && (
+                  <p>• <b>保鮮期促銷</b>：{preservationItems.slice(0,3).map(i=>i.productName).join('、')} 進入保鮮期，適合 Phone/Wholesale 組合銷售</p>
                 )}
-                {lowStockProducts.length === 0 && highStockProducts.length === 0 && (
-                  <p className="text-green-600">✓ 當前庫存配置良好，無急迫調整需求</p>
+                {displayQty > 50 && (
+                  <p className="text-orange-600">• <b>臨期處理</b>：{displayItems.slice(0,3).map(i=>i.productName).join('、')} 已逾 14 天，建議促銷或轉加工通路</p>
+                )}
+                {freshQty === 0 && preservationQty === 0 && displayQty === 0 && (
+                  <p className="text-gray-500">• 無庫存或無採收日期記錄，請確保新入庫品項填寫 harvest_date</p>
                 )}
               </div>
             </div>

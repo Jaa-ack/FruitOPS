@@ -151,25 +151,27 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
           <span className="text-xs text-gray-500">即時根據庫存與訂單生成</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* 補貨建議 */}
+          {/* 通路配置建議 */}
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
             <div className="flex items-center gap-2 mb-2 text-emerald-700">
               <ShoppingBasket size={18} />
-              <span className="text-sm font-semibold">補貨建議</span>
+              <span className="text-sm font-semibold">通路配置建議</span>
             </div>
             <p className="text-sm text-gray-700">
-              低庫存：<b>{lowStockItems}</b> 項
+              {availableFruits.length > 0
+                ? `當月在季：${availableFruits.map(f => f.cnName).join('、')}`
+                : '淡季無新鮮水果'}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {availableFruits.length > 0
-                ? `當月在季水果優先補貨：${availableFruits.map(f => f.cnName).join('、')}`
-                : '淡季依靠冷藏庫存，建議優先銷售臨期品'}
+                ? '新鮮採收（7天內）：優先 Direct/Line 通路銷售 A/B 級品'
+                : '依靠冷藏庫存：優先推 Preservation 期品至 Phone/Wholesale'}
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              其他補貨：{safeInventory.filter(i=>i.quantity<50).slice(0,3).map(i=>i.productName||i.product_name).join('、') || '—'}
+              採收超過 14 天進入展示期，建議促銷或批發通路出清
             </p>
             <div className="mt-3">
-              <Link to="/inventory" className="text-xs text-emerald-700 hover:text-emerald-800 underline">前往分級庫存</Link>
+              <Link to="/inventory" className="text-xs text-emerald-700 hover:text-emerald-800 underline">前往庫存管理</Link>
             </div>
           </div>
 

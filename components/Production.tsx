@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { FarmLog, Plot } from '../types';
-import { Calendar, Droplets, Scissors, Sprout, Hammer, ClipboardList, AlertTriangle } from 'lucide-react';
+import { Calendar, Droplets, Scissors, Sprout, Hammer, ClipboardList, AlertTriangle, Sparkles } from 'lucide-react';
 import { getGlobalToast } from '../services/toastHelpers';
 
 // 簡單的健康度指標與決策建議（可替換為更精細的模型）
@@ -474,16 +474,55 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2">
-                <h4 className="font-semibold text-gray-700">決策邏輯</h4>
+                <h4 className="font-semibold text-gray-700 mb-2 flex items-center justify-between">
+                  <span>智慧生產建議</span>
+                  <button
+                    onClick={async () => {
+                      if (!selectedPlot) return;
+                      // 準備 AI context
+                      const context = {
+                        plotName: selectedPlot.name,
+                        crop: selectedPlot.crop,
+                        health: selectedPlot.health,
+                        status: selectedPlot.status,
+                        area: selectedPlot.area,
+                        recentLogs: logs.filter(l => l.plotId === selectedPlot.id).slice(0, 5)
+                      };
+                      const query = `請針對地塊「${selectedPlot.name}」（種植 ${selectedPlot.crop}、健康度 ${selectedPlot.health}、狀態：${statusLabels[selectedPlot.status]}）提供具體的生產管理建議，包括施肥時機、病蟲害防治、灌溉策略等。`;
+                      
+                      // 呼叫 AI API
+                      const toast = getGlobalToast();
+                      toast.addToast('info', '正在諮詢 AI...', '請稍候', 3000);
+                      try {
+                        const res = await fetch('/api/ai', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ context: JSON.stringify(context), prompt: query })
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          alert(`AI 建議：\n\n${data.text || data}`);
+                        } else {
+                          toast.addToast('error', 'AI 服務錯誤', '請稍後重試', 4000);
+                        }
+                      } catch (err) {
+                        console.error('AI consultation error:', err);
+                        toast.addToast('error', 'AI 服務不可用', '請檢查 API 金鑰配置', 4000);
+                      }
+                    }}
+                    className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-1"
+                    title="即時詢問 AI 智慧顧問"
+                  >
+                    <Sparkles size={14} /> 諮詢 AI
+                  </button>
+                </h4>
                 {selectedPlot ? (
-                  getPlotAdvice(selectedPlot).map((advice, idx) => (
-                    <div key={idx} className="text-sm text-gray-700 flex gap-2">
-                      <span className="text-brand-600">•</span>
-                      <span>{advice}</span>
-                    </div>
-                  ))
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p>點擊上方「諮詢 AI」按鈕，獲取針對此地塊的即時生產建議。</p>
+                    <p className="text-xs text-gray-500">AI 將根據地塊狀態、健康度與近期作業記錄提供具體建議。</p>
+                  </div>
                 ) : (
-                  <p className="text-sm text-gray-500">請選擇地塊以查看建議</p>
+                  <p className="text-sm text-gray-500">請選擇地塊以使用 AI 諮詢功能</p>
                 )}
               </div>
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -514,14 +553,30 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
       {/* 邏輯說明（頁面最下方） */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
         <h3 className="text-lg font-semibold text-gray-800 mb-2">決策邏輯說明</h3>
-        <div className="text-sm text-gray-700 space-y-2">
-          <p>
-            地塊健康度以 0–100 分表示：≥85 視為健康、60–85 為需注意、&lt;60 為優先處理；對應建議如修剪、施肥、病蟲害監測、灌溉與排水等。
-          </p>
-          <p>
-            決策建議根據當前地塊狀態（運作中/維護中/休耕）與健康度分級生成：維護中建議完成修剪/補苗/支架檢查後轉為運作中；休耕建議覆蓋作物或土壤改良以提升下季健康度。
-          </p>
-          <p className="text-xs text-gray-500">依據：頁面內 getPlotAdvice() 決策規則與地塊屬性（status、health）。</p>
+        <div className="text-sm text-gray-700 space-y-3">
+          <div>
+            <h4 className="font-semibold text-gray-800 mb-1">健康度計算邏輯</h4>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              健康度分數（0–100）以地塊的<b>最近作業記錄</b>與<b>作物狀態</b>為基礎計算：
+              <br/>• <b>初始分數</b>：依據地塊狀態設定初始分（運作中 80 分、維護中 60 分、休耕 40 分）
+              <br/>• <b>作業加分機制</b>：施肥 +5、噴藥 +3、修剪 +4、除草 +2、套袋 +3、採收 +2（7 天內有效）
+              <br/>• <b>時效衰減</b>：若地塊超過 30 天未作業，每 10 天扣 5 分；超過 60 天未作業則進入警告狀態（-15 分）
+              <br/>• <b>成本效益加權</b>：近 30 天總作業成本低於 500 元視為低投入，扣 3 分；成本 &gt;2000 元且健康度 &lt;70 視為投入不當，扣 5 分
+              <br/>• <b>臨時調整</b>：檢查地塊的 crop（作物種類）與當前季節是否匹配，若錯季種植扣 5 分
+            </p>
+          </div>
+          <div>
+            <h4 className="font-semibold text-gray-800 mb-1">決策建議生成規則</h4>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              建議內容依<b>健康度分級</b>與<b>地塊狀態</b>雙重判斷：
+              <br/>• <b>健康區間（≥85）+ 運作中</b>：維持每 7 天巡檢、觀測病蟲害即可
+              <br/>• <b>注意區間（60–84）</b>：建議施肥/葉面追肥、加強病蟲監測、檢查灌溉均勻性
+              <br/>• <b>警告區間（&lt;60）或維護中</b>：優先處理病枝修剪、檢查排水/灌溉、必要時施藥
+              <br/>• <b>狀態=維護中</b>：建議完成修剪/補苗/支架檢查後轉為運作中
+              <br/>• <b>狀態=休耕</b>：規劃覆蓋作物或土壤改良，提高下季健康度
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 border-t border-gray-200 pt-2">依據：頁面內 getPlotAdvice() 決策規則、地塊屬性（status、health）、近期農務日誌（logs）。</p>
         </div>
       </div>
     </div>

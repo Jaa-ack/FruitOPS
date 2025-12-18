@@ -571,7 +571,6 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                 <thead className="bg-gray-50 text-gray-600 text-sm font-semibold border-b border-gray-200">
                     <tr>
                     <th className="p-4">訂單日期</th>
-                    <th className="p-4">訂單編號</th>
                     <th className="p-4">來源</th>
                         <th className="p-4">客戶名稱</th>
                         <th className="p-4">內容</th>
@@ -585,7 +584,6 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                         filteredOrders.map(order => (
                             <tr key={order.id} className="hover:bg-gray-50 group">
                         <td className="p-4 text-gray-600">{formatDateTime((order as any).date || (order as any).createdAt)}</td>
-                        <td className="p-4 font-mono text-gray-500">{order.id}</td>
                                 <td className="p-4">
                                     <div className="flex items-center gap-2" title={order.channel}>
                                         {getChannelIcon(order.channel)}
@@ -646,7 +644,7 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                         ))
                     ) : (
                         <tr>
-                          <td colSpan={8} className="p-8 text-center text-gray-400">沒有符合的訂單</td>
+                          <td colSpan={7} className="p-8 text-center text-gray-400">沒有符合的訂單</td>
                         </tr>
                     )}
                 </tbody>

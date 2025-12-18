@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Customer } from '../types';
-import { User, Award, Clock, Search, Zap, Pencil } from 'lucide-react';
+import { User, Award, Clock, Search, Zap, Pencil, Smartphone } from 'lucide-react';
 import { getGlobalToast } from '../services/toastHelpers';
 
 interface CRMProps {
@@ -324,50 +324,122 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
 
       {selectedCustomer && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSelectedCustomer(null)}>
-          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-lg w-full p-5" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-3">
-              <div className="flex items-start justify-between w-full">
-                <p className="text-xs text-gray-500">客戶檔案</p>
-                <h3 className="text-xl font-bold text-gray-800">{selectedCustomer.name}</h3>
-                <p className="text-sm text-gray-500">{selectedCustomer.phone}</p>
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xl font-bold text-gray-800">{selectedCustomer.name}</h3>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getSegmentStyle(selectedCustomer.segment)}`}>
+                    {mapSegmentName(selectedCustomer.segment)}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500 mb-1">{selectedCustomer.phone}</p>
                 <button
-                  className="ml-auto inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                  className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md transition"
                   onClick={() => { setEditing(true); setEditForm({ name: selectedCustomer.name, phone: selectedCustomer.phone || '', segment: selectedCustomer.segment || 'Regular' }); }}
                   title="編輯顧客資訊"
                 >
-                  <Pencil size={14} /> 編輯
+                  <Pencil size={14} /> 編輯基本資訊
                 </button>
               </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-bold border ${getSegmentStyle(selectedCustomer.segment)}`}>
-                {mapSegmentName(selectedCustomer.segment)}
-              </span>
             </div>
+
             {(() => {
               const stats = statsByCustomer[selectedCustomer.name] || { total: 0, lastDate: '未紀錄', count: 0, orders: [] as any[] };
+              
+              // 計算通路分佈
+              const channelCounts: Record<string, number> = {};
+              stats.orders.forEach((o: any) => {
+                const ch = o.channel || 'Direct';
+                channelCounts[ch] = (channelCounts[ch] || 0) + 1;
+              });
+              const totalOrders = stats.count || stats.orders.length;
+              const channelStats = Object.entries(channelCounts).map(([ch, count]) => ({
+                channel: ch,
+                count,
+                percent: totalOrders > 0 ? Math.round((count / totalOrders) * 100) : 0
+              })).sort((a, b) => b.count - a.count);
+              
+              const mapChannelName = (ch: string) => {
+                switch(ch) {
+                  case 'Direct': return '直接銷售';
+                  case 'Line': return 'LINE';
+                  case 'Phone': return '電話';
+                  case 'Wholesale': return '批發';
+                  default: return ch;
+                }
+              };
+
               return (
                 <>
-                  <div className="space-y-2 text-sm text-gray-700">
-                    <p>累積消費：NT$ {Number(stats.total || 0).toLocaleString()}</p>
-                    <p>上次購買：{stats.lastDate ? formatDateTime(stats.lastDate) : '未紀錄'}</p>
-                    <p>訂單數量：{stats.count}</p>
-                    <p>建議行動：{selectedCustomer.segment === 'At Risk' ? '聯繫挽回，提供回購優惠。' : selectedCustomer.segment === 'VIP' ? '推送預購與專屬組合。' : '保持互動，提升回購頻率。'}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                        <Award size={16} className="text-blue-600" /> 消費統計
+                      </h4>
+                      <div className="space-y-1 text-sm text-gray-700">
+                        <p>累積消費：<b className="text-blue-600">NT$ {Number(stats.total || 0).toLocaleString()}</b></p>
+                        <p>訂單數量：<b>{stats.count}</b> 筆</p>
+                        <p>上次購買：{stats.lastDate ? formatDateTime(stats.lastDate) : '未紀錄'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                        <Smartphone size={16} className="text-green-600" /> 通路偏好
+                      </h4>
+                      {channelStats.length > 0 ? (
+                        <div className="space-y-1 text-sm text-gray-700">
+                          {channelStats.map(cs => (
+                            <div key={cs.channel} className="flex justify-between items-center">
+                              <span>{mapChannelName(cs.channel)}</span>
+                              <span className="font-semibold text-gray-800">{cs.count} 筆 ({cs.percent}%)</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500">尚無訂單記錄</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold text-gray-800 mb-2">近期消費紀錄</h4>
+
+                  <div className="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-200">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-1">建議行動</h4>
+                    <p className="text-xs text-blue-700">
+                      {selectedCustomer.segment === 'At Risk' 
+                        ? '流失風險客戶：建議透過電話或 LINE 主動聯繫，提供回購優惠或新品預告。' 
+                        : selectedCustomer.segment === 'VIP' 
+                        ? 'VIP 客戶：優先推送預購資訊與專屬組合，維持高頻互動。' 
+                        : selectedCustomer.segment === 'New'
+                        ? '新客戶：加強關係建立，推薦當季熱銷品，引導二次購買。'
+                        : '穩定客群：保持定期互動，適時推送促銷與季節新品，提升回購頻率。'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                      <Clock size={16} className="text-gray-600" /> 近期消費紀錄
+                    </h4>
                     {stats.orders && stats.orders.length > 0 ? (
-                      <div className="max-h-48 overflow-y-auto border border-gray-100 rounded-md">
+                      <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-md">
                         <table className="w-full text-left text-sm">
-                          <thead className="bg-gray-50 text-gray-600">
+                          <thead className="bg-gray-50 text-gray-600 sticky top-0">
                             <tr>
                               <th className="p-2">日期</th>
+                              <th className="p-2">通路</th>
                               <th className="p-2">內容</th>
                               <th className="p-2 text-right">金額</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                             {stats.orders.map((o: any) => (
-                              <tr key={o.id}>
-                                <td className="p-2 text-gray-600">{formatDateTime(o.date || o.createdAt)}</td>
+                              <tr key={o.id} className="hover:bg-gray-50">
+                                <td className="p-2 text-gray-600 text-xs">{formatDateTime(o.date || o.createdAt)}</td>
+                                <td className="p-2 text-xs">
+                                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
+                                    {mapChannelName(o.channel || 'Direct')}
+                                  </span>
+                                </td>
                                 <td className="p-2 text-gray-700">
                                   {(Array.isArray(o.items) ? o.items : []).map((it: any, i: number) => (
                                     <div key={i} className="text-xs">
@@ -375,35 +447,36 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                                     </div>
                                   ))}
                                 </td>
-                                <td className="p-2 text-right font-mono">NT$ {Number(o.total || 0).toLocaleString()}</td>
+                                <td className="p-2 text-right font-mono text-sm">NT$ {Number(o.total || 0).toLocaleString()}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-500">尚無訂單紀錄</p>
+                      <p className="text-xs text-gray-500 p-4 bg-gray-50 rounded-md text-center">尚無訂單紀錄</p>
                     )}
                   </div>
                 </>
               );
             })()}
+
             {/* 編輯區塊 */}
             {editing && (
-              <div className="mt-4 p-3 border border-gray-200 rounded-lg bg-gray-50">
-                <h4 className="text-sm font-semibold text-gray-800 mb-2">編輯顧客設定</h4>
-                <div className="grid grid-cols-1 gap-2 text-sm">
+              <div className="mt-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                <h4 className="text-sm font-semibold text-blue-900 mb-3">編輯顧客設定</h4>
+                <div className="grid grid-cols-1 gap-3 text-sm">
                   <label className="block">
-                    <span className="text-xs text-gray-600">姓名</span>
-                    <input className="mt-1 w-full border rounded px-2 py-1" value={editForm.name} onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                    <span className="text-xs text-gray-700 font-medium">姓名</span>
+                    <input className="mt-1 w-full border border-gray-300 rounded px-3 py-2" value={editForm.name} onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))} />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-gray-600">電話</span>
-                    <input className="mt-1 w-full border rounded px-2 py-1" value={editForm.phone} onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+                    <span className="text-xs text-gray-700 font-medium">電話</span>
+                    <input className="mt-1 w-full border border-gray-300 rounded px-3 py-2" value={editForm.phone} onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))} />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-gray-600">分級</span>
-                    <select className="mt-1 w-full border rounded px-2 py-1" value={editForm.segment} onChange={(e) => setEditForm(f => ({ ...f, segment: e.target.value }))}>
+                    <span className="text-xs text-gray-700 font-medium">客戶分級</span>
+                    <select className="mt-1 w-full border border-gray-300 rounded px-3 py-2" value={editForm.segment} onChange={(e) => setEditForm(f => ({ ...f, segment: e.target.value }))}>
                       <option value="VIP">貴賓</option>
                       <option value="Stable">穩定客群</option>
                       <option value="Regular">一般客戶</option>
@@ -412,10 +485,10 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                     </select>
                   </label>
                 </div>
-                <div className="flex justify-end gap-2 mt-3">
-                  <button className="px-3 py-1 text-sm bg-gray-200 rounded" onClick={() => setEditing(false)}>取消</button>
+                <div className="flex justify-end gap-2 mt-4">
+                  <button className="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md transition" onClick={() => setEditing(false)}>取消</button>
                   <button
-                    className="px-3 py-1 text-sm bg-brand-600 text-white rounded"
+                    className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition"
                     onClick={async () => {
                       if (!selectedCustomer) return;
                       try {
@@ -425,7 +498,6 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                           body: JSON.stringify({ name: editForm.name, phone: editForm.phone, segment: editForm.segment })
                         });
                         if (res.ok) {
-                          const updated = await res.json().catch(() => null);
                           setSelectedCustomer(prev => prev ? { ...prev, ...editForm } as Customer : prev);
                           setEditing(false);
                           const toast = getGlobalToast();
@@ -440,13 +512,14 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                       }
                     }}
                   >
-                    儲存
+                    儲存變更
                   </button>
                 </div>
               </div>
             )}
-            <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setSelectedCustomer(null)} className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">關閉</button>
+
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-200">
+              <button onClick={() => setSelectedCustomer(null)} className="px-5 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition">關閉</button>
             </div>
           </div>
         </div>
