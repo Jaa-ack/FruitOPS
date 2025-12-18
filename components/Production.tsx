@@ -510,6 +510,20 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
           </div>
         </div>
       </div>
+
+      {/* 邏輯說明（頁面最下方） */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">決策邏輯說明</h3>
+        <div className="text-sm text-gray-700 space-y-2">
+          <p>
+            地塊健康度以 0–100 分表示：≥85 視為健康、60–85 為需注意、&lt;60 為優先處理；對應建議如修剪、施肥、病蟲害監測、灌溉與排水等。
+          </p>
+          <p>
+            決策建議根據當前地塊狀態（運作中/維護中/休耕）與健康度分級生成：維護中建議完成修剪/補苗/支架檢查後轉為運作中；休耕建議覆蓋作物或土壤改良以提升下季健康度。
+          </p>
+          <p className="text-xs text-gray-500">依據：頁面內 getPlotAdvice() 決策規則與地塊屬性（status、health）。</p>
+        </div>
+      </div>
     </div>
   );
 };

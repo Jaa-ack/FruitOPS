@@ -277,40 +277,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory }) => {
         </div>
       </div>
 
-      {/* 庫存決策細節 */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm border border-blue-100">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <AlertTriangle size={20} className="text-blue-600" />
-          庫存管理細節建議
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {inventoryInsights.map((insight, idx) => (
-            <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex items-start justify-between mb-2">
-                <p className="text-sm text-gray-600 font-medium">{insight.label}</p>
-                <span className={`text-lg font-bold ${insight.color}`}>{insight.value}</span>
-              </div>
-              <p className="text-xs text-gray-500 mt-2 border-t border-gray-100 pt-2">
-                💡 {insight.advice}
-              </p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 bg-white p-4 rounded-lg border border-blue-200">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">智慧補貨建議</h4>
-          <div className="space-y-1 text-xs text-gray-600">
-            {lowStockProducts.length > 0 && (
-              <p>• 優先補貨：{lowStockProducts.slice(0, 3).map(p => p.productName || p.product_name).join('、')}{lowStockProducts.length > 3 ? ` 等 ${lowStockProducts.length} 項` : ''}</p>
-            )}
-            {highStockProducts.length > 0 && (
-              <p>• 庫存過高：{highStockProducts.slice(0, 3).map(p => p.productName || p.product_name).join('、')} 可考慮促銷</p>
-            )}
-            {lowStockProducts.length === 0 && highStockProducts.length === 0 && (
-              <p className="text-green-600">✓ 當前庫存配置良好，無急迫調整需求</p>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* （已移至分級庫存頁）庫存管理細節建議 */}
     </div>
   );
 };

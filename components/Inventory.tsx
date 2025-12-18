@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Archive, ChevronDown, ChevronUp, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Archive, ChevronDown, ChevronUp, Plus, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { getGlobalToast } from '../services/toastHelpers';
 
 interface InventoryDetail {
@@ -363,6 +363,54 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
           </table>
         </div>
       </div>
+
+      {/* 庫存決策細節（自 Dashboard 移入） */}
+      {(() => {
+        const totalInventory = (summarySummary || []).reduce((sum, s) => sum + (Number(s.totalQuantity) || 0), 0);
+        const avgStock = (summarySummary || []).length > 0 ? Math.round(totalInventory / summarySummary.length) : 0;
+        const lowStockProducts = (detailData || []).filter(d => (Number(d.quantity) || 0) < 50);
+        const highStockProducts = (detailData || []).filter(d => (Number(d.quantity) || 0) > 200);
+        const insights = [
+          { label: '總庫存量', value: `${totalInventory} 單位`, color: 'text-blue-600', advice: totalInventory < 500 ? '庫存偏低，建議規劃補貨' : '庫存充足' },
+          { label: '平均庫存', value: `${avgStock} 單位/品項`, color: 'text-green-600', advice: avgStock < 50 ? '平均庫存偏低' : '庫存分佈健康' },
+          { label: '低庫存商品', value: `${lowStockProducts.length} 項`, color: lowStockProducts.length > 0 ? 'text-orange-600' : 'text-gray-600', advice: lowStockProducts.length > 0 ? '需要優先補貨' : '無急迫缺貨風險' },
+          { label: '高庫存商品', value: `${highStockProducts.length} 項`, color: highStockProducts.length > 3 ? 'text-purple-600' : 'text-gray-600', advice: highStockProducts.length > 3 ? '考慮促銷降低庫存' : '庫存控制良好' }
+        ];
+        return (
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm border border-blue-100">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+              <AlertTriangle size={20} className="text-blue-600" />
+              庫存管理細節建議
+            </h3>
+            <p className="text-xs text-gray-600 mb-4">依據：低庫存閾值 <50、高庫存閾值 >200；平均庫存 = 總庫存 / 品項數。</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {insights.map((ins, idx) => (
+                <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="text-sm text-gray-600 font-medium">{ins.label}</p>
+                    <span className={`text-lg font-bold ${ins.color}`}>{ins.value}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 border-t border-gray-100 pt-2">💡 {ins.advice}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 bg-white p-4 rounded-lg border border-blue-200">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">智慧補貨建議</h4>
+              <div className="space-y-1 text-xs text-gray-600">
+                {lowStockProducts.length > 0 && (
+                  <p>• 優先補貨：{lowStockProducts.slice(0, 3).map(p => p.productName).join('、')}{lowStockProducts.length > 3 ? ` 等 ${lowStockProducts.length} 項` : ''}</p>
+                )}
+                {highStockProducts.length > 0 && (
+                  <p>• 庫存過高：{highStockProducts.slice(0, 3).map(p => p.productName).join('、')} 可考慮促銷</p>
+                )}
+                {lowStockProducts.length === 0 && highStockProducts.length === 0 && (
+                  <p className="text-green-600">✓ 當前庫存配置良好，無急迫調整需求</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 空狀態 */}
       {summarySummary.length === 0 && (

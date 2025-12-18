@@ -361,6 +361,20 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
     setNewItems(items => items.length === 1 ? items : items.filter((_, i) => i !== idx));
   };
 
+  const formatDateTime = (val?: string) => {
+    if (!val) return '-';
+    // Try parse ISO or YYYY-MM-DD
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return val;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const Y = d.getFullYear();
+    const M = pad(d.getMonth() + 1);
+    const D = pad(d.getDate());
+    const h = pad(d.getHours());
+    const m = pad(d.getMinutes());
+    return `${Y}/${M}/${D} ${h}:${m}`;
+  };
+
   return (
     <div className="space-y-6">
     {!safeOrders || safeOrders.length === 0 ? (
@@ -556,8 +570,9 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
             <table className="w-full text-left border-collapse">
                 <thead className="bg-gray-50 text-gray-600 text-sm font-semibold border-b border-gray-200">
                     <tr>
-                        <th className="p-4">訂單編號</th>
-                        <th className="p-4">來源</th>
+                    <th className="p-4">訂單日期</th>
+                    <th className="p-4">訂單編號</th>
+                    <th className="p-4">來源</th>
                         <th className="p-4">客戶名稱</th>
                         <th className="p-4">內容</th>
                         <th className="p-4 text-right">總金額</th>
@@ -569,7 +584,8 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                     {filteredOrders.length > 0 ? (
                         filteredOrders.map(order => (
                             <tr key={order.id} className="hover:bg-gray-50 group">
-                                <td className="p-4 font-mono text-gray-500">{order.id}</td>
+                        <td className="p-4 text-gray-600">{formatDateTime((order as any).date || (order as any).createdAt)}</td>
+                        <td className="p-4 font-mono text-gray-500">{order.id}</td>
                                 <td className="p-4">
                                     <div className="flex items-center gap-2" title={order.channel}>
                                         {getChannelIcon(order.channel)}
@@ -630,7 +646,7 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                         ))
                     ) : (
                         <tr>
-                            <td colSpan={7} className="p-8 text-center text-gray-400">沒有符合的訂單</td>
+                          <td colSpan={8} className="p-8 text-center text-gray-400">沒有符合的訂單</td>
                         </tr>
                     )}
                 </tbody>

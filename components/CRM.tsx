@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Customer } from '../types';
-import { User, Award, Clock, Star, Search, Zap } from 'lucide-react';
+import { User, Award, Clock, Search, Zap, Pencil } from 'lucide-react';
 import { getGlobalToast } from '../services/toastHelpers';
 
 interface CRMProps {
@@ -15,6 +15,8 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
   const [searchParams] = useSearchParams();
   const [segmentation, setSegmentation] = useState<any[]>([]);
   const [calculating, setCalculating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<{ name: string; phone: string; segment: string }>({ name: '', phone: '', segment: 'Regular' });
   
   // 從 URL 參數獲取客戶名稱（來自訂單跳轉）
   const highlightedCustomer = useMemo(() => {
@@ -90,11 +92,25 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
         switch(segment) {
             case 'VIP': return '貴賓';
             case 'Stable': return '穩定客群';
+            case 'Regular': return '一般客戶';
             case 'New': return '新客';
             case 'At Risk': return '流失風險';
             default: return segment;
         }
     };
+
+  const formatDateTime = (val?: string) => {
+    if (!val) return '-';
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return val;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const Y = d.getFullYear();
+    const M = pad(d.getMonth() + 1);
+    const D = pad(d.getDate());
+    const h = pad(d.getHours());
+    const m = pad(d.getMinutes());
+    return `${Y}/${M}/${D} ${h}:${m}`;
+  };
 
   // 計算客戶 RFM 分級
   const handleCalculateSegmentation = async () => {
@@ -248,19 +264,7 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
         </div>
       ) : (
         <>
-      {/* RFM Explanation Card */}
-      <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-start gap-4">
-          <div className="p-2 bg-indigo-200 rounded-lg text-indigo-700 mt-1">
-              <Star size={20} />
-          </div>
-          <div>
-              <h3 className="font-bold text-indigo-900">RFM 智慧分群</h3>
-              <p className="text-indigo-700 text-sm mt-1">
-                系統根據 <strong>最近購買日 (Recency)</strong>、<strong>購買頻率 (Frequency)</strong> 與 <strong>消費金額 (Monetary)</strong> 自動將客戶分群。
-                建議優先挽回 "At Risk" 客戶，並提供 "VIP" 客戶專屬預購連結。
-              </p>
-          </div>
-      </div>
+        {/* 移除 RFM 說明卡片，依需求簡化介面 */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredCustomers.map(customer => {
@@ -311,21 +315,7 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                         查看完整檔案
                     </button>
                     
-                    {/* 快速分級調整 */}
-                    <div className="pt-2 border-t border-gray-100">
-                      <label className="text-xs text-gray-600 font-semibold block mb-1">快速調整分級</label>
-                      <select
-                        value={customer.segment}
-                        onChange={(e) => handleUpdateCustomerSegment(customer.id, e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                      >
-                        <option value="VIP">貴賓 (VIP)</option>
-                        <option value="Stable">穩定客群</option>
-                        <option value="Regular">一般客戶</option>
-                        <option value="New">新客</option>
-                        <option value="At Risk">流失風險</option>
-                      </select>
-                    </div>
+                    {/* 依需求：移除快速調整分級，改於顧客設定中調整 */}
                 </div>
             </div>
           );
@@ -336,10 +326,17 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSelectedCustomer(null)}>
           <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-lg w-full p-5" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-start mb-3">
-              <div>
+              <div className="flex items-start justify-between w-full">
                 <p className="text-xs text-gray-500">客戶檔案</p>
                 <h3 className="text-xl font-bold text-gray-800">{selectedCustomer.name}</h3>
                 <p className="text-sm text-gray-500">{selectedCustomer.phone}</p>
+                <button
+                  className="ml-auto inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                  onClick={() => { setEditing(true); setEditForm({ name: selectedCustomer.name, phone: selectedCustomer.phone || '', segment: selectedCustomer.segment || 'Regular' }); }}
+                  title="編輯顧客資訊"
+                >
+                  <Pencil size={14} /> 編輯
+                </button>
               </div>
               <span className={`px-2 py-1 rounded-full text-xs font-bold border ${getSegmentStyle(selectedCustomer.segment)}`}>
                 {mapSegmentName(selectedCustomer.segment)}
@@ -351,7 +348,7 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                 <>
                   <div className="space-y-2 text-sm text-gray-700">
                     <p>累積消費：NT$ {Number(stats.total || 0).toLocaleString()}</p>
-                    <p>上次購買：{stats.lastDate || '未紀錄'}</p>
+                    <p>上次購買：{stats.lastDate ? formatDateTime(stats.lastDate) : '未紀錄'}</p>
                     <p>訂單數量：{stats.count}</p>
                     <p>建議行動：{selectedCustomer.segment === 'At Risk' ? '聯繫挽回，提供回購優惠。' : selectedCustomer.segment === 'VIP' ? '推送預購與專屬組合。' : '保持互動，提升回購頻率。'}</p>
                   </div>
@@ -370,7 +367,7 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                           <tbody className="divide-y divide-gray-100">
                             {stats.orders.map((o: any) => (
                               <tr key={o.id}>
-                                <td className="p-2 text-gray-600">{o.date || o.createdAt || '-'}</td>
+                                <td className="p-2 text-gray-600">{formatDateTime(o.date || o.createdAt)}</td>
                                 <td className="p-2 text-gray-700">
                                   {(Array.isArray(o.items) ? o.items : []).map((it: any, i: number) => (
                                     <div key={i} className="text-xs">
@@ -391,6 +388,63 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                 </>
               );
             })()}
+            {/* 編輯區塊 */}
+            {editing && (
+              <div className="mt-4 p-3 border border-gray-200 rounded-lg bg-gray-50">
+                <h4 className="text-sm font-semibold text-gray-800 mb-2">編輯顧客設定</h4>
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <label className="block">
+                    <span className="text-xs text-gray-600">姓名</span>
+                    <input className="mt-1 w-full border rounded px-2 py-1" value={editForm.name} onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-gray-600">電話</span>
+                    <input className="mt-1 w-full border rounded px-2 py-1" value={editForm.phone} onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-gray-600">分級</span>
+                    <select className="mt-1 w-full border rounded px-2 py-1" value={editForm.segment} onChange={(e) => setEditForm(f => ({ ...f, segment: e.target.value }))}>
+                      <option value="VIP">貴賓</option>
+                      <option value="Stable">穩定客群</option>
+                      <option value="Regular">一般客戶</option>
+                      <option value="New">新客</option>
+                      <option value="At Risk">流失風險</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="flex justify-end gap-2 mt-3">
+                  <button className="px-3 py-1 text-sm bg-gray-200 rounded" onClick={() => setEditing(false)}>取消</button>
+                  <button
+                    className="px-3 py-1 text-sm bg-brand-600 text-white rounded"
+                    onClick={async () => {
+                      if (!selectedCustomer) return;
+                      try {
+                        const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: editForm.name, phone: editForm.phone, segment: editForm.segment })
+                        });
+                        if (res.ok) {
+                          const updated = await res.json().catch(() => null);
+                          setSelectedCustomer(prev => prev ? { ...prev, ...editForm } as Customer : prev);
+                          setEditing(false);
+                          const toast = getGlobalToast();
+                          toast.addToast('success', '已更新顧客資料', `${editForm.name} 的設定已更新`, 4000);
+                        } else {
+                          const toast = getGlobalToast();
+                          toast.addToast('error', '更新失敗', '伺服器返回錯誤', 4000);
+                        }
+                      } catch (e) {
+                        const toast = getGlobalToast();
+                        toast.addToast('error', '更新失敗', '網路錯誤', 4000);
+                      }
+                    }}
+                  >
+                    儲存
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setSelectedCustomer(null)} className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">關閉</button>
             </div>

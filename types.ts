@@ -49,7 +49,7 @@ export interface FarmLog {
     id: string;
     name: string;
     phone: string;
-    segment: 'VIP' | 'Stable' | 'New' | 'At Risk'; // RFM Segment
+    segment: 'VIP' | 'Stable' | 'Regular' | 'New' | 'At Risk'; // RFM Segment
     totalSpent: number;
     lastOrderDate: string;
   }

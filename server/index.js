@@ -489,13 +489,34 @@ app.post('/api/orders', async (req, res) => {
         items: JSON.stringify(items),
         total: orderData.total,
         status: orderData.status,
-        date: new Date().toISOString().slice(0,10)
+        date: new Date().toISOString()
       });
+      // 同步建立客戶（若不存在）
+      db.data.customers = db.data.customers || [];
+      const exists = db.data.customers.find(c => (c.name || '').trim() === (orderData.customer_name || '').trim());
+      if (!exists) {
+        db.data.customers.push({
+          id: `C-${Date.now()}`,
+          name: orderData.customer_name,
+          phone: '',
+          segment: 'New',
+          totalSpent: 0,
+          lastOrderDate: new Date().toISOString()
+        });
+      } else {
+        exists.lastOrderDate = new Date().toISOString();
+      }
       await db.write();
       return res.status(201).json({ ok: true, orderId });
     }
 
     await getSupabaseClient().addOrder(orderData);
+    // 確保客戶存在（以名稱為準則 upsert）
+    try {
+      await getSupabaseClient().upsertCustomerByName({ name: orderData.customer_name, phone: '', segment: 'New' });
+    } catch (e) {
+      console.warn('Upsert customer after order failed:', e.message);
+    }
     res.status(201).json({ ok: true, orderId });
   } catch (err) {
     console.error('POST /api/orders error', err);
@@ -579,6 +600,53 @@ app.get('/api/customers', async (req, res) => {
   } catch (err) {
     console.error('GET /api/customers error', err);
     res.status(500).json({ error: '取得客戶失敗', details: err.message });
+  }
+});
+
+// 新增客戶
+app.post('/api/customers', async (req, res) => {
+  try {
+    const { name, phone, segment } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'name 必填' });
+    if (!SUPABASE_READY) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
+      const db = await ensureLocalDB();
+      db.data.customers = db.data.customers || [];
+      const exists = db.data.customers.find(c => (c.name || '').trim() === name.trim());
+      if (exists) return res.json(exists);
+      const row = { id: `C-${Date.now()}`, name, phone: phone || '', segment: segment || 'New', totalSpent: 0, lastOrderDate: null };
+      db.data.customers.push(row);
+      await db.write();
+      return res.status(201).json(row);
+    }
+    const created = await getSupabaseClient().upsertCustomerByName({ name, phone, segment });
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('POST /api/customers error', err);
+    res.status(500).json({ error: '新增客戶失敗', details: err.message });
+  }
+});
+
+// 更新客戶資訊
+app.put('/api/customers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body || {};
+    if (!SUPABASE_READY) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
+      const db = await ensureLocalDB();
+      db.data.customers = db.data.customers || [];
+      const idx = db.data.customers.findIndex(c => c.id === id);
+      if (idx < 0) return res.status(404).json({ error: '客戶不存在' });
+      db.data.customers[idx] = { ...db.data.customers[idx], ...updates };
+      await db.write();
+      return res.json(db.data.customers[idx]);
+    }
+    const updated = await getSupabaseClient().updateCustomer(id, updates);
+    res.json(updated || { ok: true });
+  } catch (err) {
+    console.error('PUT /api/customers/:id error', err);
+    res.status(500).json({ error: '更新客戶失敗', details: err.message });
   }
 });
 

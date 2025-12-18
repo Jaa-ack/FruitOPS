@@ -57,6 +57,12 @@ const ProductionCalendar: React.FC = () => {
       }
     });
 
+    // 排序：春夏秋依月份遞增；冬季固定顯示順序 12 → 1
+    grouped.Spring.sort((a, b) => a.month - b.month);
+    grouped.Summer.sort((a, b) => a.month - b.month);
+    grouped.Fall.sort((a, b) => a.month - b.month);
+    grouped.Winter.sort((a, b) => (a.month === 12 ? -1 : a.month) - (b.month === 12 ? -1 : b.month));
+
     return grouped;
   }, [calendarData]);
 
@@ -123,7 +129,7 @@ const ProductionCalendar: React.FC = () => {
     <div className="w-full bg-white rounded-lg shadow-lg p-6">
       {/* 標題 */}
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900">📅 新新果園生產銷售行事曆</h2>
+        <h2 className="text-3xl font-bold text-gray-900">📅 欣欣果園生產銷售行事曆</h2>
         <p className="text-gray-600 mt-2">
           根據水果生產週期設計的年度行銷決策指南。點擊月份查看詳細信息。
         </p>
@@ -131,7 +137,7 @@ const ProductionCalendar: React.FC = () => {
 
       {/* 4 個季節分組 */}
       <div className="space-y-8">
-        {Object.entries(seasonedData).map(([season, months]) => {
+        {Object.entries(seasonedData).map(([season, months]: [string, CalendarDay[]]) => {
           const seasonStyle = getSeasonStyle(season);
           const SeasonIcon = seasonStyle.icon;
 
@@ -150,7 +156,7 @@ const ProductionCalendar: React.FC = () => {
 
               {/* 月份網格 */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {months.map(day => {
+                {months.map((day: CalendarDay) => {
                   const priorityBadge = getPriorityBadge(day.priority);
                   const isExpanded = expandedMonth === day.month;
 
@@ -257,6 +263,10 @@ const ProductionCalendar: React.FC = () => {
                                 </>
                               )}
                             </ul>
+                            <div className="mt-2 text-[11px] text-blue-900/80">
+                              依據：優先度取自 `types/fruitCycle.ts` 的 MONTH_INFO.priority 與各品項 peakMonths；
+                              決策建議綜合季節性、可銷售品項與淡旺季規劃生成。
+                            </div>
                           </div>
                         </div>
                       )}
@@ -269,34 +279,7 @@ const ProductionCalendar: React.FC = () => {
         })}
       </div>
 
-      {/* 圖例 */}
-      <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <h4 className="font-semibold text-gray-900 mb-3">📖 圖例說明</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
-              🔥 旺季
-            </span>
-            <span className="text-gray-600">銷售高峰期</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-semibold">
-              ⚡ 準備期
-            </span>
-            <span className="text-gray-600">農務關鍵期</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
-              🌙 淡季
-            </span>
-            <span className="text-gray-600">庫存清理期</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🌡️</span>
-            <span className="text-gray-600">冷藏溫度範圍</span>
-          </div>
-        </div>
-      </div>
+      {/* 圖例說明已移除 */}
 
       {/* 年度概覽統計 */}
       <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">

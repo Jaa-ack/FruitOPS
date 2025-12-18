@@ -199,6 +199,37 @@ async function getCustomers() {
   return data.map(toCamelCase);
 }
 
+async function findCustomerByName(name) {
+  if (!name) return null;
+  const rows = await fetchSupabase(`/customers?name=eq.${encodeURIComponent(name)}&select=*`);
+  return rows && rows.length ? toCamelCase(rows[0]) : null;
+}
+
+async function addCustomer(customer) {
+  const normalized = toSnakeCase(customer);
+  const rows = await fetchSupabase('/customers', {
+    method: 'POST',
+    body: JSON.stringify(normalized)
+  });
+  return rows && rows[0] ? toCamelCase(rows[0]) : null;
+}
+
+async function updateCustomer(id, updates) {
+  const normalized = toSnakeCase(updates);
+  const rows = await fetchSupabase(`/customers?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(normalized)
+  });
+  return rows && rows[0] ? toCamelCase(rows[0]) : null;
+}
+
+async function upsertCustomerByName({ name, phone, segment }) {
+  const existing = await findCustomerByName(name);
+  if (existing) return existing;
+  const created = await addCustomer({ name, phone: phone || '', segment: segment || 'New', totalSpent: 0 });
+  return created;
+}
+
 /**
  * 計算客戶 RFM 分級
  * R = Recency (最近購買天數，越少越好)
@@ -272,17 +303,14 @@ async function calculateAndApplyCustomerSegmentation() {
  */
 async function updateCustomerSegments(segmentUpdates = []) {
   try {
-    const updates = segmentUpdates.map(({ id, segment }) => ({
-      id,
-      segment
-    }));
-    
-    // 一次性批量更新
-    await fetchSupabase('/customers', {
-      method: 'PATCH',
-      body: JSON.stringify(updates)
-    });
-    
+    // Supabase REST 不支援不同值的批量 PATCH，逐筆更新
+    for (const upd of (segmentUpdates || [])) {
+      if (!upd || !upd.id) continue;
+      await fetchSupabase(`/customers?id=eq.${encodeURIComponent(upd.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ segment: upd.segment })
+      });
+    }
     return { ok: true };
   } catch (err) {
     console.error('[Segmentation] Batch update failed:', err);
@@ -539,6 +567,10 @@ module.exports = {
   getOrders,
   updateOrderStatus,
   getCustomers,
+  findCustomerByName,
+  addCustomer,
+  updateCustomer,
+  upsertCustomerByName,
   addOrder,
   getInventoryV2,
   getInventorySummary,
