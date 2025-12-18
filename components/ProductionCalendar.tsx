@@ -35,14 +35,14 @@ const ProductionCalendar: React.FC = () => {
 
   // 按季節分組
   const seasonedData = useMemo(() => {
-    const grouped = {
+    const grouped: Record<string, CalendarDay[]> = {
       Spring: [] as CalendarDay[],
       Summer: [] as CalendarDay[],
       Fall: [] as CalendarDay[],
       Winter: [] as CalendarDay[],
     };
 
-    const seasonMap = {
+    const seasonMap: Record<string, number[]> = {
       Spring: [2, 3, 4, 5],
       Summer: [6, 7, 8],
       Fall: [9, 10, 11],
@@ -52,7 +52,7 @@ const ProductionCalendar: React.FC = () => {
     calendarData.forEach(day => {
       for (const [season, months] of Object.entries(seasonMap)) {
         if (months.includes(day.month)) {
-          grouped[season as keyof typeof grouped].push(day);
+          grouped[season].push(day);
         }
       }
     });
