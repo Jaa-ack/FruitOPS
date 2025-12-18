@@ -199,6 +199,113 @@ async function getCustomers() {
   return data.map(toCamelCase);
 }
 
+/**
+ * 計算客戶 RFM 分級
+ * R = Recency (最近購買天數，越少越好)
+ * F = Frequency (購買次數)
+ * M = Monetary (消費金額)
+ * 根據 R/F/M 綜合評分，自動分級為 VIP / Stable / Regular / New / At Risk
+ */
+async function calculateAndApplyCustomerSegmentation() {
+  try {
+    // 取得所有客戶與訂單
+    const customers = await getCustomers();
+    const orders = await getOrders();
+    
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    // 為每個客戶計算 RFM 分數
+    const segmentation = customers.map(cust => {
+      // 計算 Recency：最後一次訂單距今天數
+      const custOrders = Array.isArray(orders) ? orders.filter((o) => 
+        (o.customerName || o.customer_name || '').trim().toLowerCase() === 
+        (cust.name || '').trim().toLowerCase()
+      ) : [];
+      
+      let recencyDays = 999; // 無訂單，設為很大的數
+      if (custOrders.length > 0) {
+        const lastOrder = custOrders.reduce((latest, curr) => {
+          const currDate = curr.createdAt || curr.created_at || today;
+          const latestDate = latest.createdAt || latest.created_at || today;
+          return currDate > latestDate ? curr : latest;
+        });
+        const lastDate = new Date(lastOrder.createdAt || lastOrder.created_at || today);
+        recencyDays = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
+      }
+      
+      // 計算 Frequency：訂單數
+      const frequency = custOrders.length;
+      
+      // 計算 Monetary：總消費金額
+      const monetary = custOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      
+      // RFM 綜合評分邏輯
+      let segment = 'Regular';
+      if (frequency === 0) {
+        segment = 'New';
+      } else if (monetary >= 100000 && frequency >= 5 && recencyDays <= 60) {
+        segment = 'VIP';
+      } else if (monetary >= 50000 && frequency >= 3 && recencyDays <= 90) {
+        segment = 'Stable';
+      } else if (recencyDays > 180 && frequency > 0) {
+        segment = 'At Risk';
+      }
+      
+      return {
+        id: cust.id,
+        name: cust.name,
+        segment,
+        rfm: { recencyDays, frequency, monetary }
+      };
+    });
+    
+    return segmentation;
+  } catch (err) {
+    console.error('[RFM] Segmentation calculation failed:', err);
+    return [];
+  }
+}
+
+/**
+ * 批量更新客戶分級
+ */
+async function updateCustomerSegments(segmentUpdates = []) {
+  try {
+    const updates = segmentUpdates.map(({ id, segment }) => ({
+      id,
+      segment
+    }));
+    
+    // 一次性批量更新
+    await fetchSupabase('/customers', {
+      method: 'PATCH',
+      body: JSON.stringify(updates)
+    });
+    
+    return { ok: true };
+  } catch (err) {
+    console.error('[Segmentation] Batch update failed:', err);
+    throw err;
+  }
+}
+
+/**
+ * 手動更新單個客戶分級
+ */
+async function updateCustomerSegment(customerId, segment) {
+  try {
+    const result = await fetchSupabase(`/customers?id=eq.${customerId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ segment })
+    });
+    return result[0] || { ok: true };
+  } catch (err) {
+    console.error('[Segmentation] Update failed:', err);
+    throw err;
+  }
+}
+
 async function addOrder(orderData) {
   // Add order first
   const orderInsert = {
@@ -439,6 +546,11 @@ module.exports = {
   upsertInventoryItem,
   moveInventory,
   consumeInventory,
+  
+  // Customer segmentation methods
+  calculateAndApplyCustomerSegmentation,
+  updateCustomerSegments,
+  updateCustomerSegment,
   
   // Utility functions
   fetchSupabase,

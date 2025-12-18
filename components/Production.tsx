@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { FarmLog, Plot } from '../types';
 import { Calendar, Droplets, Scissors, Sprout, Hammer, ClipboardList, AlertTriangle } from 'lucide-react';
+import { getGlobalToast } from '../services/toastHelpers';
 
 // 簡單的健康度指標與決策建議（可替換為更精細的模型）
 const getPlotAdvice = (plot: Plot) => {
@@ -114,6 +115,10 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
     onAddLog(log);
     setShowForm(false);
     setNewLog({ activity: '', cropType: '', cost: 0, worker: '' });
+    
+    // Toast 通知
+    const toast = getGlobalToast();
+    toast.addToast('success', '農務日誌已新增', `${log.worker} 於 ${mergedPlots.find(p => p.id === log.plotId)?.name} 執行 ${log.activity} 作業`, 4000);
   };
 
   const handleStatusUpdate = (plotId: string, status: Plot['status']) => {
@@ -158,9 +163,17 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
         await onUpdateLog(payload);
       }
       cancelEditLog();
+      
+      // Toast 通知
+      const toast = getGlobalToast();
+      toast.addToast('success', '農務日誌已更新', `記錄編號 ${editingLogId} 已成功更新`, 4000);
     } catch (err) {
       console.error('Update log failed', err);
       setFormError('更新失敗，請稍後再試');
+      
+      // Error Toast
+      const toast = getGlobalToast();
+      toast.addToast('error', '更新失敗', '日誌編輯失敗，請稍後重試', 4000);
     }
   };
 

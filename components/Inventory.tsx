@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Archive, ChevronDown, ChevronUp, Plus, Edit2, Trash2 } from 'lucide-react';
+import { getGlobalToast } from '../services/toastHelpers';
 
 interface InventoryDetail {
   id: string;
@@ -117,12 +118,19 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
         setFormData({ productName: '', grade: 'A', quantity: 0, locationId: '' });
         await fetchData();
         onInventoryChange?.();
+        
+        // Toast 通知
+        const toast = getGlobalToast();
+        const locName = storageLocations.find(l => l.id === formData.locationId)?.name || '未知儲位';
+        toast.addToast('success', '庫存已新增', `${formData.productName} (${formData.grade}級) 數量 ${formData.quantity} 已新增至 ${locName}`, 4000);
       } else {
-        alert('保存失敗');
+        const toast = getGlobalToast();
+        toast.addToast('error', '保存失敗', '庫存新增失敗，請檢查輸入', 4000);
       }
     } catch (err) {
       console.error('Save error:', err);
-      alert('保存失敗');
+      const toast = getGlobalToast();
+      toast.addToast('error', '保存失敗', '網路錯誤，請稍後重試', 4000);
     }
   };
 
@@ -159,9 +167,15 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
       setMoveModal({ open: false, item: null });
       await fetchData();
       onInventoryChange?.();
+      
+      // Toast 通知
+      const toast = getGlobalToast();
+      const targetLoc = storageLocations.find(l => l.id === targetLocationId)?.name || '目標儲位';
+      toast.addToast('success', '庫存已移動', `已移動 ${moveModal.item.productName} (${moveModal.item.grade}級) 數量 ${qty} 至 ${targetLoc}`, 4000);
     } catch (err) {
       console.error('Move inventory error', err);
-      alert('移動失敗');
+      const toast = getGlobalToast();
+      toast.addToast('error', '移動失敗', '庫存移動失敗，請稍後重試', 4000);
     }
   };
 

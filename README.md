@@ -2,12 +2,7 @@
 
 完整的果園營運管理系統，支援果園地塊管理、農事日誌、分級庫存與訂單管理，並提供決策建議與 AI 顧問。
 
-線上展示（Vercel 部署）：
-
-- 前台網站：https://fruit-ops.vercel.app
-- 健康檢查：https://fruit-ops.vercel.app/api/healthz
-
-![FruitOPS Banner](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
+線上展示（Vercel 部署）：https://fruit-ops.vercel.app
 
 ## ✨ 功能特色
 
@@ -269,83 +264,6 @@ Vercel 會直接注入環境變數，請在 Vercel Dashboard → Project Setting
 - 資料庫：所有資料存於 Supabase（PostgreSQL），透過 `server/supabase.js` 存取
 - Health Check：`/api/healthz` 直接回應，不載入整個 Express app，確保快速回應
 
-### 故障排查
-
-**Q: 部署後 API 無回應或逾時**  
-A: 檢查 Vercel Function Logs，確認環境變數正確設定。專案已去除多餘包裝，直接以 Express app 回應，避免 handler 掛起問題。
-
-**Q: 前端顯示「無法連線到伺服器」**  
-A: 確認 API 路徑正確（Vite proxy 在本地開發時有效，生產環境前端直接呼叫 `/api/*`）
-
-**Q: Supabase 連線失敗**  
-A: 檢查 `SUPABASE_URL` 與 `SUPABASE_SERVICE_KEY` 是否正確，並確認 Supabase 專案狀態正常（未暫停）
-
-### 其他平台部署
-
-如需部署至 Railway、Render、Fly.io 等平台，請確保設定相同的環境變數，並根據平台文件調整建置指令與啟動指令。
-
-## 🆘 常見問題
-
-### 本地開發
-
-**Q: 訂單無法建立（PGRST204 錯誤）**  
-A: 
-- 確認資料庫 SQL 遷移已執行
-- 檢查後端運行：`curl http://localhost:4000/api/healthz`
-- 查看後端終端的錯誤訊息
-
-**Q: 品級選項不顯示**  
-A:
-- 確認 `product_grades` 表有資料
-- 測試 API：`curl http://localhost:4000/api/product-grades`
-- 開啟瀏覽器 DevTools → Network 查看請求
-
-**Q: Port 4000 已被占用**  
-A:
-```bash
-npm run dev:kill  # 自動清理
-# 或手動清理
-lsof -ti:4000 | xargs kill -9
-```
-
-**Q: 新增日誌失敗**  
-A: 
-- 確認已執行最新的 SQL 遷移
-- 檢查 `plots` 表有對應的 `plot_id`
-- 查看後端日誌確認錯誤詳情
-
-**Q: 資料庫連線失敗**  
-A:
-- 確認 `.env` 在 `server/` 目錄下
-- 驗證 SUPABASE_URL 和 SUPABASE_SERVICE_KEY 正確
-- 確認 Supabase 專案狀態正常（沒有暫停）
-
-**Q: AI 功能回應 403/超時**  
-A:
-- 403 常見於金鑰無效或被判定外洩，請於 Google AI Studio 重新產生
-- 未設定金鑰時，系統會回傳可讀錯誤（不影響其他功能）
-- 逾時可調整 `AI_TIMEOUT_MS`
-
-### Vercel 部署
-
-**Q: 部署後前端無法載入資料**  
-A:
-- 確認環境變數 `SUPABASE_URL` 與 `SUPABASE_SERVICE_KEY` 正確設定
-- 前往 `/api/healthz` 確認 API 正常回應
-- 檢查 Vercel Function Logs 查看錯誤訊息
-
-**Q: API 請求逾時**  
-A:
-- 設定 `DISABLE_LOCAL_DB=1` 確保不嘗試本地 fallback
-- 調高 `SUPABASE_FETCH_TIMEOUT_MS`（預設 5000ms）
-- 確認 Supabase 專案與 Vercel 部署區域地理位置接近（減少延遲）
-
-**Q: 環境變數未生效**  
-A:
-- 確認環境變數 Scope 選擇 **Production, Preview, Development**
-- 重新部署專案（Vercel Dashboard → Deployments → Redeploy）
-- 檢查變數名稱無拼寫錯誤（大小寫敏感）
-
 ## 📚 參考資源
 
 - [Supabase 官方文件](https://supabase.com/docs) - Supabase 資料庫與 API 設定
@@ -353,19 +271,6 @@ A:
 - [Google Gemini API](https://ai.google.dev/docs) - AI 功能整合說明
 
 ## 🔐 安全提醒
-
-⚠️ **重要：保護你的密鑰**
-
-- 永遠不要將 `.env` 檔案 commit 到 Git（已加入 `.gitignore`）
-- 不要在文件中填入真實 API Key（以說明文字取代）
-- 使用 `SUPABASE_SERVICE_KEY` 時需特別小心（具有完整權限）
-- 生產環境建議使用 Supabase RLS（Row Level Security）限制資料存取
-- 部署時使用平台的 Environment Variables 功能，避免硬編碼密鑰
-- 定期輪換 API 金鑰與資料庫密碼
-
-## 🤝 貢獻
-
-歡迎提交 Issue 或 Pull Request！
 
 ### 開發流程
 1. Fork 此專案

@@ -582,6 +582,81 @@ app.get('/api/customers', async (req, res) => {
   }
 });
 
+// 新增端點：計算客戶 RFM 分級（自動分級）
+app.get('/api/customers/segmentation/calculate', async (req, res) => {
+  try {
+    const requestId = req.id;
+    console.log(`[${requestId}] GET /api/customers/segmentation/calculate`);
+    
+    if (!SUPABASE_READY) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+    
+    const client = getSupabaseClient();
+    const segmentation = await client.calculateAndApplyCustomerSegmentation();
+    
+    res.json({ ok: true, segmentation });
+  } catch (err) {
+    console.error('GET /api/customers/segmentation/calculate error', err);
+    res.status(500).json({ error: '客戶分級計算失敗', details: err.message });
+  }
+});
+
+// 新增端點：應用客戶分級（批量）
+app.post('/api/customers/segmentation/apply', async (req, res) => {
+  try {
+    const requestId = req.id;
+    const { segmentUpdates } = req.body; // [{ id, segment }, ...]
+    console.log(`[${requestId}] POST /api/customers/segmentation/apply with ${segmentUpdates?.length || 0} updates`);
+    
+    if (!SUPABASE_READY) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+    
+    if (!Array.isArray(segmentUpdates) || segmentUpdates.length === 0) {
+      return res.status(400).json({ error: '無有效的分級更新' });
+    }
+    
+    const client = getSupabaseClient();
+    await client.updateCustomerSegments(segmentUpdates);
+    
+    res.json({ ok: true, message: `已更新 ${segmentUpdates.length} 位客戶分級` });
+  } catch (err) {
+    console.error('POST /api/customers/segmentation/apply error', err);
+    res.status(500).json({ error: '客戶分級應用失敗', details: err.message });
+  }
+});
+
+// 新增端點：更新單個客戶分級
+app.put('/api/customers/:id/segment', async (req, res) => {
+  try {
+    const requestId = req.id;
+    const { id } = req.params;
+    const { segment } = req.body;
+    console.log(`[${requestId}] PUT /api/customers/${id}/segment to ${segment}`);
+    
+    if (!SUPABASE_READY) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
+      const db = await ensureLocalDB();
+      const cust = (db.data.customers || []).find(c => c.id === id);
+      if (cust) {
+        cust.segment = segment;
+        db.write();
+        return res.json({ ok: true, customer: cust });
+      }
+      return res.status(404).json({ error: '客戶不存在' });
+    }
+    
+    const client = getSupabaseClient();
+    const result = await client.updateCustomerSegment(id, segment);
+    
+    res.json({ ok: true, customer: result });
+  } catch (err) {
+    console.error(`PUT /api/customers/:id/segment error`, err);
+    res.status(500).json({ error: '客戶分級更新失敗', details: err.message });
+  }
+});
+
 // 新增端點：獲取庫存摘要（按產品）
 app.get('/api/inventory-summary', async (req, res) => {
   try {

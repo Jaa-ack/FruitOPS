@@ -8,6 +8,7 @@ import Inventory from './components/Inventory';
 import Orders from './components/Orders';
 import CRM from './components/CRM';
 import GeminiAdvisor from './components/GeminiAdvisor';
+import { ToastContainer, useToast } from './components/Toast';
 import { FarmLog } from './types';
 
 // Sidebar Component
@@ -65,6 +66,14 @@ const App: React.FC = () => {
   const [inventory, setInventory] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+
+  // Toast 狀態
+  const toast = useToast();
+
+  // 將 toast 放在 window 全域，讓元件內能存取
+  useEffect(() => {
+    (window as any).__appToast = toast;
+  }, [toast]);
 
   const handleAddLog = (log: FarmLog) => {
     // Send to API then refresh logs with error handling
@@ -128,6 +137,8 @@ const App: React.FC = () => {
   return (
     <Router>
       <div className="flex h-screen bg-gray-50 overflow-hidden">
+        {/* Global Toast Container */}
+        <ToastContainer messages={toast.messages} onClose={toast.removeToast} />
         {/* Desktop Sidebar */}
         <Sidebar />
 

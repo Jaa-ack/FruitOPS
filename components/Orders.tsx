@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Order } from '../types';
 import { Search, Filter, Phone, Smartphone, FileText, ShoppingBag, Truck } from 'lucide-react';
+import { getGlobalToast } from '../services/toastHelpers';
 
 interface OrdersProps {
   orders: Order[];
@@ -205,12 +206,25 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
       });
       if (response.ok) {
         onOrderChange?.();
+        
+        // Toast 通知
+        const toast = getGlobalToast();
+        const statusName: Record<string, string> = {
+          'Pending': '待確認',
+          'Confirmed': '已確認',
+          'Shipped': '已出貨',
+          'Completed': '已完成',
+          'Cancelled': '已取消'
+        };
+        toast.addToast('success', '訂單狀態已更新', `訂單 ${orderId} 已更新為 ${statusName[newStatus] || newStatus}`, 4000);
       } else {
-        alert('狀態更新失敗');
+        const toast = getGlobalToast();
+        toast.addToast('error', '狀態更新失敗', '伺服器返回錯誤', 4000);
       }
     } catch (err) {
       console.error('Status update error:', err);
-      alert('狀態更新失敗');
+      const toast = getGlobalToast();
+      toast.addToast('error', '狀態更新失敗', '網路錯誤', 4000);
     }
   };
 
@@ -272,9 +286,14 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
       // refresh inventory detail
       const invRes = await fetch('/api/inventory-detail');
       if (invRes.ok) setInventoryDetail(await invRes.json());
+      
+      // Toast 通知
+      const toast = getGlobalToast();
+      toast.addToast('success', '訂單揀貨已完成', `訂單 ${pickModal.order.id} 已完成揀貨並扣除庫存`, 4000);
     } catch (err) {
       console.error('Pick order error', err);
-      alert('取貨失敗');
+      const toast = getGlobalToast();
+      toast.addToast('error', '揀貨失敗', '操作失敗，請檢查庫存和訂單內容', 4000);
     }
   };
 
@@ -311,15 +330,22 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
         body: JSON.stringify(payload)
       });
       if (response.ok) {
+        const data = await response.json();
         setNewOrder({ customerName: '', channel: 'Direct', total: 0 });
         setNewItems([{ productName: '', grade: 'A', qty: 1, price: 0 }]);
         onOrderChange?.();
+        
+        // Toast 通知
+        const toast = getGlobalToast();
+        toast.addToast('success', '訂單已建立', `${payload.customerName} 的訂單 (總額 $${total.toLocaleString()}) 已成功建立`, 4000);
       } else {
-        alert('新增訂單失敗');
+        const toast = getGlobalToast();
+        toast.addToast('error', '建立訂單失敗', '伺服器返回錯誤，請稍後再試', 4000);
       }
     } catch (err) {
       console.error('Create order error:', err);
-      alert('新增訂單失敗');
+      const toast = getGlobalToast();
+      toast.addToast('error', '建立訂單失敗', '網路錯誤，請檢查連線', 4000);
     }
   };
 
