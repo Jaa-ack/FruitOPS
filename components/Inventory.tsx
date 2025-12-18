@@ -382,7 +382,7 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
               <AlertTriangle size={20} className="text-blue-600" />
               庫存管理細節建議
             </h3>
-            <p className="text-xs text-gray-600 mb-4">依據：低庫存閾值 <50、高庫存閾值 >200；平均庫存 = 總庫存 / 品項數。</p>
+            <p className="text-xs text-gray-600 mb-4">依據：低庫存閾值 &lt;50、高庫存閾值 &gt;200；平均庫存 = 總庫存 / 品項數。</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {insights.map((ins, idx) => (
                 <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
