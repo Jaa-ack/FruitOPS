@@ -496,7 +496,6 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
                           const adviceText = data.text || String(data);
                           // 儲存至日誌（作為 AIAdvice），記錄時間；失敗則本地顯示
                           const baseLog = {
-                            id: `AI-${Date.now()}`,
                             date: new Date().toISOString(),
                             plotId: selectedPlot.id,
                             activity: 'AIAdvice' as const,

@@ -224,8 +224,8 @@ app.get('/api/logs', async (req, res) => {
 app.post(
   '/api/logs',
   // validation
-  body('id').isString().notEmpty(),
-  body('date').isISO8601().withMessage('date 必須為 YYYY-MM-DD'),
+  body('id').optional().isString(),
+  body('date').isISO8601().withMessage('date 必須為 ISO8601'),
   body('plotId').isString().notEmpty(),
   body('activity').isString().notEmpty(),
   body('cropType').optional().isString(),
@@ -243,11 +243,14 @@ app.post(
         if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
         const db = await ensureLocalDB();
         db.data.logs = db.data.logs || [];
-        db.data.logs.unshift({ id, date, plotId, activity, cropType, notes, cost, worker });
+        const newId = id && typeof id === 'string' ? id : randomUUID();
+        db.data.logs.unshift({ id: newId, date, plotId, activity, cropType, notes, cost, worker });
         await db.write();
-        return res.status(201).json({ ok: true });
+        return res.status(201).json({ ok: true, id: newId });
       }
-      await getSupabaseClient().addLog({ id, date, plotId, activity, cropType, notes, cost, worker });
+      // For Supabase, omit id to let DB generate UUID by default unless provided
+      const payload = id ? { id, date, plotId, activity, cropType, notes, cost, worker } : { date, plotId, activity, cropType, notes, cost, worker };
+      await getSupabaseClient().addLog(payload);
       res.status(201).json({ ok: true });
     } catch (err) {
       console.error('POST /api/logs error', err);
