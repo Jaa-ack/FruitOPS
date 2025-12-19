@@ -41,7 +41,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory, customers = []
     : [];
 
   const monthlyOrders = orders.filter(o => {
-    const d = parseDate(o.date as any);
+    const d = parseDate(o.date as any) || parseDate((o as any).createdAt) || parseDate((o as any).created_at);
     return d && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear && o.status === 'Completed';
   });
 
