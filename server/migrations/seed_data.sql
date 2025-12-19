@@ -1,132 +1,15 @@
--- 007_recreate_schema_and_seed_full.sql
--- Recreate core tables with safe defaults and richer seed data.
--- Includes: plots, customers, orders, order_items, inventory, storage_locations, logs, product_grades, view v_inventory_summary
+-- =====================================================================
+-- FruitOPS 資料填充
+-- 填充測試/開發用的初始資料
+-- 執行前請先執行 schema.sql 建立資料表結構
+-- =====================================================================
 
 BEGIN;
 
--- Ensure uuid generation is available
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
--- Drop dependent views first
-DROP VIEW IF EXISTS v_inventory_summary;
-
--- Drop tables in dependency order
-DROP TABLE IF EXISTS order_items CASCADE;
-DROP TABLE IF EXISTS orders CASCADE;
-DROP TABLE IF EXISTS inventory CASCADE;
-DROP TABLE IF EXISTS logs CASCADE;
-DROP TABLE IF EXISTS customers CASCADE;
-DROP TABLE IF EXISTS storage_locations CASCADE;
-DROP TABLE IF EXISTS plots CASCADE;
-DROP TABLE IF EXISTS product_grades CASCADE;
-
 -- =====================================================================
--- Schema
+-- 產品等級定義
 -- =====================================================================
 
--- Product grades
-CREATE TABLE product_grades (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_name TEXT NOT NULL UNIQUE,
-  grades TEXT[] NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Storage locations
-CREATE TABLE storage_locations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  type TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Plots
-CREATE TABLE plots (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  crop TEXT NOT NULL,
-  area NUMERIC,
-  status TEXT NOT NULL,
-  health INTEGER NOT NULL DEFAULT 80,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Customers
-CREATE TABLE customers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  phone TEXT,
-  region TEXT,
-  preferred_channel TEXT,
-  segment TEXT,
-  total_spent NUMERIC NOT NULL DEFAULT 0,
-  last_order_date TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Orders
-CREATE TABLE orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_name TEXT NOT NULL,
-  channel TEXT,
-  total NUMERIC NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'Pending',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Order items
-CREATE TABLE order_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_name TEXT NOT NULL,
-  grade TEXT NOT NULL,
-  quantity INTEGER NOT NULL,
-  price NUMERIC NOT NULL,
-  origin_plot_id UUID NULL REFERENCES plots(id)
-);
-
--- Inventory
-CREATE TABLE inventory (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_name TEXT NOT NULL,
-  grade TEXT NOT NULL,
-  quantity INTEGER NOT NULL DEFAULT 0,
-  location_id UUID NOT NULL REFERENCES storage_locations(id) ON DELETE RESTRICT,
-  harvest_date DATE,
-  package_spec TEXT,
-  batch_id TEXT,
-  origin_plot_id UUID,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Logs
-CREATE TABLE logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  plot_id UUID NOT NULL REFERENCES plots(id) ON DELETE RESTRICT,
-  activity TEXT NOT NULL,
-  crop_type TEXT,
-  notes TEXT,
-  cost NUMERIC NOT NULL DEFAULT 0,
-  worker TEXT NOT NULL
-);
-
--- Summary view
-CREATE VIEW v_inventory_summary AS
-SELECT
-  product_name,
-  SUM(quantity) AS total_quantity,
-  COUNT(DISTINCT grade) AS grade_count,
-  COUNT(DISTINCT location_id) AS location_count
-FROM inventory
-GROUP BY product_name;
-
--- =====================================================================
--- Seed data (richer set)
--- =====================================================================
-
--- Product grades
 INSERT INTO product_grades (product_name, grades) VALUES
   ('水蜜桃', ARRAY['A','B','C']),
   ('蜜蘋果', ARRAY['A','B','C']),
@@ -134,7 +17,10 @@ INSERT INTO product_grades (product_name, grades) VALUES
   ('梨子',   ARRAY['A','B','C'])
 ON CONFLICT (product_name) DO UPDATE SET grades = EXCLUDED.grades;
 
--- Storage locations
+-- =====================================================================
+-- 儲存位置
+-- =====================================================================
+
 INSERT INTO storage_locations (name, type) VALUES
   ('冷藏一號', 'Cold'),
   ('常溫倉', 'Ambient'),
@@ -142,7 +28,10 @@ INSERT INTO storage_locations (name, type) VALUES
   ('批發運輸', 'Transit')
 ON CONFLICT (name) DO NOTHING;
 
--- Plots
+-- =====================================================================
+-- 地塊資料
+-- =====================================================================
+
 INSERT INTO plots (name, crop, area, status, health) VALUES
   ('北坡一號', '水蜜桃', 0.8, 'Active', 88),
   ('南坡二號', '柿子',   0.6, 'Maintenance', 72),
@@ -151,7 +40,10 @@ INSERT INTO plots (name, crop, area, status, health) VALUES
   ('西側老園',   '柿子',   1.0, 'Maintenance', 65)
 ON CONFLICT (name) DO NOTHING;
 
--- Customers (20)
+-- =====================================================================
+-- 客戶資料（20 位客戶）
+-- =====================================================================
+
 INSERT INTO customers (name, phone, region, preferred_channel, segment) VALUES
   ('陳大同','0912-111-222','北區','Direct','Regular'),
   ('林小美','0922-333-444','中區','Line','Stable'),
@@ -175,26 +67,32 @@ INSERT INTO customers (name, phone, region, preferred_channel, segment) VALUES
   ('吳十九','0988-777-888','中區','Direct','Regular')
 ON CONFLICT (name) DO NOTHING;
 
--- Helper to fetch location ids
+-- =====================================================================
+-- 庫存資料（11 筆跨越多個產品、等級和位置）
+-- =====================================================================
+
+-- 使用 CTE 獲取儲存位置 ID
 WITH loc AS (
   SELECT name, id FROM storage_locations
 )
--- Inventory (more rows across locations and grades)
-INSERT INTO inventory (product_name, grade, quantity, location_id, harvest_date, package_spec, batch_id, origin_plot_id)
-SELECT '水蜜桃','A',120,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '5 days','2kg 禮盒','BATCH-SMA-001',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
-SELECT '水蜜桃','B',200,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '8 days','散裝10kg','BATCH-SMB-001',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
-SELECT '水蜜桃','C',150,(SELECT id FROM loc WHERE name='門市展示'), CURRENT_DATE - INTERVAL '2 days','1kg 小盒','BATCH-SMC-002',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
-SELECT '蜜蘋果','A',80,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '4 days','2kg 禮盒','BATCH-MA-003',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
-SELECT '蜜蘋果','B',140,(SELECT id FROM loc WHERE name='門市展示'), CURRENT_DATE - INTERVAL '3 days','1kg 小盒','BATCH-MB-004',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
-SELECT '蜜蘋果','C',220,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '10 days','散裝10kg','BATCH-MC-005',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
-SELECT '柿子','A',90,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '6 days','2kg 禮盒','BATCH-KA-006',(SELECT id FROM plots WHERE name='南坡二號') UNION ALL
-SELECT '柿子','B',160,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '9 days','散裝10kg','BATCH-KB-007',(SELECT id FROM plots WHERE name='南坡二號') UNION ALL
-SELECT '梨子','A',110,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '7 days','2kg 禮盒','BATCH-PA-008',(SELECT id FROM plots WHERE name='河畔區') UNION ALL
-SELECT '梨子','B',180,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '5 days','散裝10kg','BATCH-PB-009',(SELECT id FROM plots WHERE name='河畔區') UNION ALL
-SELECT '梨子','C',200,(SELECT id FROM loc WHERE name='批發運輸'), CURRENT_DATE - INTERVAL '1 day','散裝20kg','BATCH-PC-010',(SELECT id FROM plots WHERE name='河畔區');
+INSERT INTO inventory (product_name, grade, quantity, location_id, harvest_date, origin_plot_id)
+SELECT '水蜜桃','A',120,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '5 days',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
+SELECT '水蜜桃','B',200,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '8 days',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
+SELECT '水蜜桃','C',150,(SELECT id FROM loc WHERE name='門市展示'), CURRENT_DATE - INTERVAL '2 days',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
+SELECT '蜜蘋果','A',80,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '4 days',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
+SELECT '蜜蘋果','B',140,(SELECT id FROM loc WHERE name='門市展示'), CURRENT_DATE - INTERVAL '3 days',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
+SELECT '蜜蘋果','C',220,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '10 days',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
+SELECT '柿子','A',90,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '6 days',(SELECT id FROM plots WHERE name='南坡二號') UNION ALL
+SELECT '柿子','B',160,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '9 days',(SELECT id FROM plots WHERE name='南坡二號') UNION ALL
+SELECT '梨子','A',110,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '7 days',(SELECT id FROM plots WHERE name='河畔區') UNION ALL
+SELECT '梨子','B',180,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '5 days',(SELECT id FROM plots WHERE name='河畔區') UNION ALL
+SELECT '梨子','C',200,(SELECT id FROM loc WHERE name='批發運輸'), CURRENT_DATE - INTERVAL '1 day',(SELECT id FROM plots WHERE name='河畔區');
 
--- Orders + items (15 orders)
--- Using CTEs to bind generated order IDs
+-- =====================================================================
+-- 訂單與訂單明細（15 筆訂單，包含 3 位 VIP 客戶的多筆訂單）
+-- =====================================================================
+
+-- 訂單 1: 陳大同
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status)
   VALUES (gen_random_uuid(),'陳大同','Direct',2350,'Completed') RETURNING id
@@ -203,6 +101,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'蜜蘋果','A',3,350 FROM o UNION ALL SELECT id,'梨子','B',5,220 FROM o;
 UPDATE customers SET total_spent = total_spent + 2350, last_order_date = NOW() WHERE name='陳大同';
 
+-- 訂單 2: 林小美
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status)
   VALUES (gen_random_uuid(),'林小美','Line',1860,'Completed') RETURNING id
@@ -211,6 +110,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'水蜜桃','A',2,400 FROM o UNION ALL SELECT id,'水蜜桃','C',4,180 FROM o;
 UPDATE customers SET total_spent = total_spent + 1860, last_order_date = NOW() WHERE name='林小美';
 
+-- 訂單 3: 王阿強
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status)
   VALUES (gen_random_uuid(),'王阿強','Phone',2960,'Completed') RETURNING id
@@ -219,6 +119,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'蜜蘋果','B',4,250 FROM o UNION ALL SELECT id,'水蜜桃','A',4,320 FROM o;
 UPDATE customers SET total_spent = total_spent + 2960, last_order_date = NOW() WHERE name='王阿強';
 
+-- 訂單 4: 張三
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status)
   VALUES (gen_random_uuid(),'張三','Wholesale',5400,'Completed') RETURNING id
@@ -227,6 +128,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'蜜蘋果','C',10,150 FROM o UNION ALL SELECT id,'梨子','C',12,120 FROM o;
 UPDATE customers SET total_spent = total_spent + 5400, last_order_date = NOW() WHERE name='張三';
 
+-- 訂單 5: 李四
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status)
   VALUES (gen_random_uuid(),'李四','Direct',1450,'Completed') RETURNING id
@@ -235,7 +137,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'水蜜桃','B',2,280 FROM o UNION ALL SELECT id,'蜜蘋果','A',1,350 FROM o UNION ALL SELECT id,'梨子','C',5,120 FROM o;
 UPDATE customers SET total_spent = total_spent + 1450, last_order_date = NOW() WHERE name='李四';
 
--- ... add 10 more orders similar to above for richer dataset
+-- 訂單 6: 羅十
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status)
   VALUES (gen_random_uuid(),'羅十','Phone',1720,'Completed') RETURNING id
@@ -244,6 +146,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'水蜜桃','B',3,280 FROM o UNION ALL SELECT id,'蜜蘋果','C',4,150 FROM o;
 UPDATE customers SET total_spent = total_spent + 1720, last_order_date = NOW() WHERE name='羅十';
 
+-- 訂單 7: 鄭十一
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status)
   VALUES (gen_random_uuid(),'鄭十一','Line',3220,'Completed') RETURNING id
@@ -252,6 +155,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'柿子','A',6,320 FROM o UNION ALL SELECT id,'蜜蘋果','B',4,250 FROM o;
 UPDATE customers SET total_spent = total_spent + 3220, last_order_date = NOW() WHERE name='鄭十一';
 
+-- 訂單 8: 吳十六
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status)
   VALUES (gen_random_uuid(),'吳十六','Direct',1980,'Completed') RETURNING id
@@ -260,6 +164,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'蜜蘋果','A',2,350 FROM o UNION ALL SELECT id,'梨子','B',4,220 FROM o;
 UPDATE customers SET total_spent = total_spent + 1980, last_order_date = NOW() WHERE name='吳十六';
 
+-- 訂單 9: 孫十七
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status)
   VALUES (gen_random_uuid(),'孫十七','Line',1520,'Completed') RETURNING id
@@ -268,8 +173,11 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'蜜蘋果','A',1,400 FROM o UNION ALL SELECT id,'水蜜桃','C',4,180 FROM o;
 UPDATE customers SET total_spent = total_spent + 1520, last_order_date = NOW() WHERE name='孫十七';
 
--- 新增三位高消費客戶的訂單 (總消費額 >= 10000)
--- 客戶1: 王阿強 (額外訂單讓其總消費超過10000)
+-- =====================================================================
+-- VIP 客戶的額外訂單（讓總消費 >= 10000）
+-- =====================================================================
+
+-- 王阿強的額外訂單（訂單 10 & 11）
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status, created_at)
   VALUES (gen_random_uuid(),'王阿強','Phone',3850,'Completed', NOW() - INTERVAL '30 days') RETURNING id
@@ -286,7 +194,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'柿子','A',10,320 FROM o UNION ALL SELECT id,'梨子','A',4,250 FROM o;
 UPDATE customers SET total_spent = total_spent + 4200, last_order_date = NOW() - INTERVAL '30 days' WHERE name='王阿強';
 
--- 客戶2: 張三 (額外訂單讓其總消費超過10000)
+-- 張三的額外訂單（訂單 12）
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status, created_at)
   VALUES (gen_random_uuid(),'張三','Wholesale',6800,'Completed', NOW() - INTERVAL '35 days') RETURNING id
@@ -295,7 +203,7 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'水蜜桃','C',30,180 FROM o UNION ALL SELECT id,'蜜蘋果','C',8,150 FROM o;
 UPDATE customers SET total_spent = total_spent + 6800, last_order_date = NOW() - INTERVAL '35 days' WHERE name='張三';
 
--- 客戶3: 鄭十一 (額外訂單讓其總消費超過10000)
+-- 鄭十一的額外訂單（訂單 13 & 14）
 WITH o AS (
   INSERT INTO orders (id, customer_name, channel, total, status, created_at)
   VALUES (gen_random_uuid(),'鄭十一','Line',4280,'Completed', NOW() - INTERVAL '40 days') RETURNING id
@@ -312,7 +220,10 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'水蜜桃','A',6,400 FROM o UNION ALL SELECT id,'柿子','A',5,320 FROM o;
 UPDATE customers SET total_spent = total_spent + 3720, last_order_date = NOW() - INTERVAL '40 days' WHERE name='鄭十一';
 
--- Logs (20+ entries across activities)
+-- =====================================================================
+-- 農務日誌（12 筆橫跨多個地塊的作業記錄）
+-- =====================================================================
+
 INSERT INTO logs (date, plot_id, activity, crop_type, notes, cost, worker) VALUES
  (NOW() - INTERVAL '21 days', (SELECT id FROM plots WHERE name='北坡一號'), 'Fertilize', '水蜜桃', '底肥施用，依土壤檢測配方', 3000, '阿德'),
  (NOW() - INTERVAL '18 days', (SELECT id FROM plots WHERE name='北坡一號'), 'Pesticide', '水蜜桃', '針對病蟲進行低劑量施藥', 1800, '小芳'),
@@ -327,9 +238,28 @@ INSERT INTO logs (date, plot_id, activity, crop_type, notes, cost, worker) VALUE
  (NOW() - INTERVAL '11 days', (SELECT id FROM plots WHERE name='東側試驗田'), 'Pesticide','蜜蘋果','低劑量生物性防治', 900, '小芳'),
  (NOW() - INTERVAL '9 days',  (SELECT id FROM plots WHERE name='西側老園'),   'Pruning',  '柿子','修剪更新樹勢', 1300, '全員');
 
--- 新增：RFM 分級鎖定欄位（若不存在）
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS rfm_locked BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS rfm_locked_reason TEXT;
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS rfm_locked_at TIMESTAMPTZ;
-
 COMMIT;
+
+-- =====================================================================
+-- 資料驗證查詢（可選）
+-- =====================================================================
+
+-- 檢查各表資料筆數
+-- SELECT 
+--   'product_grades' AS table_name, COUNT(*) AS row_count FROM product_grades UNION ALL
+-- SELECT 'storage_locations', COUNT(*) FROM storage_locations UNION ALL
+-- SELECT 'plots', COUNT(*) FROM plots UNION ALL
+-- SELECT 'customers', COUNT(*) FROM customers UNION ALL
+-- SELECT 'orders', COUNT(*) FROM orders UNION ALL
+-- SELECT 'order_items', COUNT(*) FROM order_items UNION ALL
+-- SELECT 'inventory', COUNT(*) FROM inventory UNION ALL
+-- SELECT 'logs', COUNT(*) FROM logs;
+
+-- 檢查 VIP 客戶消費總額
+-- SELECT name, segment, total_spent, last_order_date
+-- FROM customers
+-- WHERE total_spent >= 10000
+-- ORDER BY total_spent DESC;
+
+-- 檢查庫存摘要
+-- SELECT * FROM v_inventory_summary ORDER BY product_name;
