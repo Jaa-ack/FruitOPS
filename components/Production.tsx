@@ -525,11 +525,14 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
                             toast.addToast('warning', '新增日誌失敗', '建議已顯示但未儲存', 4000);
                           }
                         } else {
-                          toast.addToast('error', 'AI 服務錯誤', '請稍後重試', 4000);
+                          const errData = await res.json().catch(() => ({}));
+                          const errMsg = errData.text || errData.error || '請稍後重試';
+                          toast.addToast('error', 'AI 服務錯誤', errMsg, 5000);
                         }
                       } catch (err) {
                         console.error('AI consultation error:', err);
-                        toast.addToast('error', 'AI 服務不可用', '請檢查 API 金鑰配置', 4000);
+                        const errMsg = err instanceof Error ? err.message : 'unknown error';
+                        toast.addToast('error', 'AI 服務不可用', `網路錯誤: ${errMsg}`, 5000);
                       }
                     }}
                     className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-1"
