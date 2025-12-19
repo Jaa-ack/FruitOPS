@@ -246,7 +246,7 @@ async function addOrder(orderData) {
   
   // 轉換 camelCase 到 snake_case
   const normalized = toSnakeCase(orderData);
-  const { id, customer_name, channel, source, total, payment_status, status, order_items } = normalized;
+  const { id, customer_name, channel, total, status, order_items } = normalized;
 
   // 產生或調整訂單編號：確保最後 8 碼為 YYYYMMDD
   const now = new Date();
@@ -264,14 +264,14 @@ async function addOrder(orderData) {
   }
   // 嘗試用傳入的 id 插入（若 orders.id 為 TEXT 會成功）
   let ins = await sb.from('orders')
-    .insert([{ id: orderId, customer_name, channel, source, total, payment_status, status }])
+    .insert([{ id: orderId, customer_name, channel, total, status }])
     .select('id')
     .single();
 
   if (ins.error) {
     // 若型別不相容（例如 DB 為 UUID），改為不指定 id 讓 DB 產生
     const alt = await sb.from('orders')
-      .insert([{ customer_name, channel, source, total, payment_status, status }])
+      .insert([{ customer_name, channel, total, status }])
       .select('id')
       .single();
     if (alt.error) throw alt.error;

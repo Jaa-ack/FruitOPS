@@ -446,7 +446,7 @@ app.get('/api/orders', async (req, res) => {
 
 // Create new order
 app.post('/api/orders', async (req, res) => {
-  const { customerName, channel, source, items, total, payment_status, status } = req.body;
+  const { customerName, channel, items, total, status } = req.body;
   
   if (!items || items.length === 0) {
     return res.status(400).json({ error: '訂單必須包含至少一項商品' });
@@ -468,9 +468,7 @@ app.post('/api/orders', async (req, res) => {
       id: orderId,
       customer_name: customerName || '未命名客戶',
       channel: channel || 'Direct',
-      source: source || 'Other',
       total: Number(total) || 0,
-      payment_status: payment_status || 'Unpaid',
       status: status || 'Pending',
       order_items: items.map(item => ({
         product_name: item.productName,
@@ -489,11 +487,9 @@ app.post('/api/orders', async (req, res) => {
         id: orderId,
         customerName: orderData.customer_name,
         channel: orderData.channel,
-        source: orderData.source,
         items: JSON.stringify(items),
         total: orderData.total,
         status: orderData.status,
-        payment_status: orderData.payment_status,
         date: new Date().toISOString()
       });
       // 同步建立客戶（若不存在）

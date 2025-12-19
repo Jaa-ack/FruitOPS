@@ -340,9 +340,7 @@ async function addOrder(orderData) {
     id: orderData.id,
     customer_name: orderData.customer_name,
     channel: orderData.channel,
-    source: orderData.source,
     total: orderData.total,
-    payment_status: orderData.payment_status,
     status: orderData.status
   };
   

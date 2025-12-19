@@ -313,9 +313,6 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
                             <p className="text-xs mt-1 font-medium text-brand-600 flex items-center gap-1"><span className={`inline-block w-2 h-2 rounded-full ${healthDot(plot.health)}`}></span>健康度：{plot.health}%</p>
                       </div>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-2 text-xs text-gray-700">
-                      <p className="text-gray-600">此區不提供預設建議，請於右側使用「諮詢 AI」取得即時建議。</p>
-                    </div>
                 </button>
             ))}
         </div>
@@ -497,29 +494,37 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
                         if (res.ok) {
                           const data = await res.json();
                           const adviceText = data.text || String(data);
-                          // 儲存至日誌（作為 AIAdvice），記錄時間
+                          // 儲存至日誌（作為 AIAdvice），記錄時間；失敗則本地顯示
+                          const baseLog = {
+                            id: `AI-${Date.now()}`,
+                            date: new Date().toISOString(),
+                            plotId: selectedPlot.id,
+                            activity: 'AIAdvice' as const,
+                            cropType: selectedPlot.crop || '',
+                            notes: adviceText,
+                            cost: 0,
+                            worker: 'AI'
+                          };
                           try {
-                            const logEntry = {
-                              id: `AI-${Date.now()}`,
-                              date: new Date().toISOString(),
-                              plotId: selectedPlot.id,
-                              activity: 'AIAdvice',
-                              cropType: selectedPlot.crop || '',
-                              notes: adviceText,
-                              cost: 0,
-                              worker: 'AI'
-                            };
-                            await fetch('/api/logs', {
+                            const saveRes = await fetch('/api/logs', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify(logEntry)
+                              body: JSON.stringify(baseLog)
                             });
-                            // 本地同步更新列表（即時顯示最新建議）
-                            onAddLog?.(logEntry as any);
+                            if (saveRes.ok) {
+                              onAddLog?.(baseLog as any);
+                              toast.addToast('success', 'AI 建議已儲存', '最新建議已寫入日誌', 3000);
+                            } else {
+                              const localLog = { ...baseLog, id: `AI-LOCAL-${Date.now()}`, worker: 'AI (未儲存)' };
+                              onAddLog?.(localLog as any);
+                              toast.addToast('warning', '新增日誌失敗', '建議已顯示但未儲存', 4000);
+                            }
                           } catch (e) {
                             console.error('Failed to persist AI advice', e);
+                            const localLog = { ...baseLog, id: `AI-LOCAL-${Date.now()}`, worker: 'AI (未儲存)' };
+                            onAddLog?.(localLog as any);
+                            toast.addToast('warning', '新增日誌失敗', '建議已顯示但未儲存', 4000);
                           }
-                          alert(`AI 建議（已儲存）：\n\n${adviceText}`);
                         } else {
                           toast.addToast('error', 'AI 服務錯誤', '請稍後重試', 4000);
                         }
@@ -536,7 +541,6 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
                 </h4>
                 {selectedPlot ? (
                   <div className="text-sm text-gray-600 space-y-2">
-                    <p>此頁不提供預設建議；請點擊「諮詢 AI」取得即時建議，系統會紀錄建議與時間。</p>
                     {(() => {
                       const advices = logs
                         .filter(l => l.plotId === selectedPlot.id && l.activity === 'AIAdvice')
@@ -595,7 +599,6 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
           <p>
             健康度分數（0–100）以最近作業與作物狀態計算；初始分依地塊狀態設定，近 7 天作業加分、長期未作業扣分，並考量成本效益與季節匹配度。
           </p>
-          <p className="text-xs text-gray-500">此頁不提供預設建議，請使用上方「諮詢 AI」取得具體建議並自動紀錄時間。</p>
         </div>
       </div>
     </div>

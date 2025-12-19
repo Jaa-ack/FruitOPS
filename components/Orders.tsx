@@ -16,8 +16,6 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
   const [newOrder, setNewOrder] = useState({
     customerName: '',
     channel: 'Direct',
-    source: 'Other',
-    paymentStatus: 'Unpaid',
     total: 0
   });
   const [newItems, setNewItems] = useState([
@@ -321,8 +319,6 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
     const payload = {
       customerName: newOrder.customerName || '未命名客戶',
       channel: newOrder.channel,
-      source: newOrder.source,
-      payment_status: newOrder.paymentStatus,
       status: 'Pending',
       items: normalizedItems,
       total
@@ -336,7 +332,7 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        setNewOrder({ customerName: '', channel: 'Direct', source: 'Other', paymentStatus: 'Unpaid', total: 0 });
+        setNewOrder({ customerName: '', channel: 'Direct', total: 0 });
           setNewItems([{ productName: '', grade: 'A', qty: 1, price: 0, originPlotId: '' }]);
         onOrderChange?.();
         
@@ -436,6 +432,7 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
 
         if (promoList.length === 0) return null;
         return (
+          <>
           <div className="bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-2">促銷優先品項與推薦客戶</h3>
             <p className="text-xs text-gray-600 mb-3">
@@ -494,6 +491,61 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
               </ul>
             </div>
           </div>
+          {/* 優先行銷對象（加權 RFM 公式） */}
+          {(() => {
+            // 構建 RFM 加權分數：R(0.4) F(0.3) M(0.3)
+            const now = new Date();
+            const dayDiff = (d?: string) => {
+              if (!d) return 9999;
+              const dt = new Date(d);
+              if (isNaN(dt.getTime())) return 9999;
+              return Math.floor((now.getTime() - dt.getTime()) / (1000 * 60 * 60 * 24));
+            };
+            // 以 orders 計算頻次與金額，recency 取最後訂單或客戶記錄
+            const byName = (name: string) => (safeOrders || []).filter(o => (o.customerName || '').trim().toLowerCase() === (name || '').trim().toLowerCase());
+            const candidates = (customers || []).map(c => {
+              const os = byName(c.name || c.customer_name || '');
+              const frequency = os.length;
+              const monetary = os.reduce((sum, o) => sum + (Number(o.total) || 0), 0) || Number(c.totalSpent || 0);
+              const lastDate = os.reduce((max, o) => {
+                const d = o.date || (o as any).createdAt || (o as any).created_at;
+                return (d && (!max || String(d) > String(max))) ? d : max;
+              }, c.lastOrderDate || undefined);
+              const recencyDays = dayDiff(lastDate);
+              return { name: c.name || c.customer_name, frequency, monetary, recencyDays };
+            });
+            if (candidates.length === 0) return null;
+            const maxF = Math.max(1, ...candidates.map(x => x.frequency));
+            const maxM = Math.max(1, ...candidates.map(x => x.monetary));
+            const scoreOf = (x: {frequency:number; monetary:number; recencyDays:number}) => {
+              const r = Math.exp(- (x.recencyDays || 9999) / 30); // 30 天衰減
+              const f = (x.frequency || 0) / maxF;
+              const m = (x.monetary || 0) / maxM;
+              return 0.4 * r + 0.3 * f + 0.3 * m;
+            };
+            const ranked = candidates
+              .map(x => ({...x, score: scoreOf(x)}))
+              .sort((a, b) => b.score - a.score)
+              .slice(0, 5);
+            return (
+              <div className="mt-6 bg-white border border-indigo-200 rounded-md p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">優先行銷對象（加權 RFM）</h3>
+                <p className="text-xs text-gray-600 mb-3">公式：Score = 0.4·R + 0.3·F + 0.3·M，其中 R = e^{-天數/30}，F/M 以樣本最大值正規化。</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {ranked.map((c, i) => (
+                    <div key={i} className="border border-gray-200 rounded-md p-3">
+                      <div className="flex justify-between">
+                        <div className="text-sm font-semibold text-gray-800">{c.name}</div>
+                        <div className="text-xs text-indigo-700 font-mono">Score {c.score.toFixed(3)}</div>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-600">R：{isFinite(c.recencyDays) ? `${c.recencyDays} 天` : '未知'}；F：{c.frequency}；M：NT$ {Number(c.monetary).toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+          </>
         );
         })()}
       </>
@@ -552,34 +604,7 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                 <option value="Wholesale">批發</option>
               </select>
             </div>
-            <div>
-              <label className="text-xs text-gray-600 mb-1 block">來源</label>
-              <select
-                className="border border-gray-300 rounded-md px-3 py-2 w-full"
-                value={newOrder.source}
-                onChange={(e) => setNewOrder({ ...newOrder, source: e.target.value })}
-              >
-                <option value="Other">其他</option>
-                <option value="GoogleForm">Google 表單</option>
-                <option value="LINE">LINE</option>
-                <option value="Phone">電話</option>
-                <option value="Fax">傳真</option>
-                <option value="WalkIn">現場</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-600 mb-1 block">付款狀態</label>
-              <select
-                className="border border-gray-300 rounded-md px-3 py-2 w-full"
-                value={newOrder.paymentStatus}
-                onChange={(e) => setNewOrder({ ...newOrder, paymentStatus: e.target.value })}
-              >
-                <option value="Unpaid">未付款</option>
-                <option value="Paid">已付款</option>
-                <option value="Partial">部分付款</option>
-                <option value="Refunded">已退款</option>
-              </select>
-            </div>
+            {/* 移除來源與付款狀態欄位 */}
             <div className="flex items-end">
               <div className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                 <p className="text-xs text-gray-500">總金額</p>
