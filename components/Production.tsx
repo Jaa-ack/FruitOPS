@@ -313,13 +313,8 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
                             <p className="text-xs mt-1 font-medium text-brand-600 flex items-center gap-1"><span className={`inline-block w-2 h-2 rounded-full ${healthDot(plot.health)}`}></span>健康度：{plot.health}%</p>
                       </div>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-2 text-xs text-gray-700 space-y-1">
-                      {getPlotAdvice(plot).map((advice, idx) => (
-                        <div key={idx} className="flex gap-2">
-                          <span className="text-emerald-600">•</span>
-                          <span>{advice}</span>
-                        </div>
-                      ))}
+                    <div className="bg-gray-50 rounded-lg p-2 text-xs text-gray-700">
+                      <p className="text-gray-600">此區不提供預設建議，請於右側使用「諮詢 AI」取得即時建議。</p>
                     </div>
                 </button>
             ))}
@@ -501,7 +496,30 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
                         });
                         if (res.ok) {
                           const data = await res.json();
-                          alert(`AI 建議：\n\n${data.text || data}`);
+                          const adviceText = data.text || String(data);
+                          // 儲存至日誌（作為 AIAdvice），記錄時間
+                          try {
+                            const logEntry = {
+                              id: `AI-${Date.now()}`,
+                              date: new Date().toISOString(),
+                              plotId: selectedPlot.id,
+                              activity: 'AIAdvice',
+                              cropType: selectedPlot.crop || '',
+                              notes: adviceText,
+                              cost: 0,
+                              worker: 'AI'
+                            };
+                            await fetch('/api/logs', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(logEntry)
+                            });
+                            // 本地同步更新列表（即時顯示最新建議）
+                            onAddLog?.(logEntry as any);
+                          } catch (e) {
+                            console.error('Failed to persist AI advice', e);
+                          }
+                          alert(`AI 建議（已儲存）：\n\n${adviceText}`);
                         } else {
                           toast.addToast('error', 'AI 服務錯誤', '請稍後重試', 4000);
                         }
@@ -517,9 +535,29 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
                   </button>
                 </h4>
                 {selectedPlot ? (
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p>點擊上方「諮詢 AI」按鈕，獲取針對此地塊的即時生產建議。</p>
-                    <p className="text-xs text-gray-500">AI 將根據地塊狀態、健康度與近期作業記錄提供具體建議。</p>
+                  <div className="text-sm text-gray-600 space-y-2">
+                    <p>此頁不提供預設建議；請點擊「諮詢 AI」取得即時建議，系統會紀錄建議與時間。</p>
+                    {(() => {
+                      const advices = logs
+                        .filter(l => l.plotId === selectedPlot.id && l.activity === 'AIAdvice')
+                        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+                      const latest = advices[0];
+                      const formatDateTime = (val?: string) => {
+                        if (!val) return '-';
+                        const d = new Date(val);
+                        if (isNaN(d.getTime())) return val;
+                        const pad = (n: number) => n.toString().padStart(2, '0');
+                        return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                      };
+                      return latest ? (
+                        <div className="bg-white border border-gray-200 rounded-md p-3">
+                          <div className="text-xs text-gray-500 mb-1">最後建議時間：{formatDateTime(String(latest.date))}</div>
+                          <div className="text-sm text-gray-800 whitespace-pre-wrap">{String(latest.notes || '')}</div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500">尚無 AI 建議紀錄</p>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500">請選擇地塊以使用 AI 諮詢功能</p>
@@ -552,31 +590,12 @@ const Production: React.FC<ProductionProps> = ({ plots, logs, onAddLog, onUpdate
 
       {/* 邏輯說明（頁面最下方） */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">決策邏輯說明</h3>
-        <div className="text-sm text-gray-700 space-y-3">
-          <div>
-            <h4 className="font-semibold text-gray-800 mb-1">健康度計算邏輯</h4>
-            <p className="text-xs text-gray-600 leading-relaxed">
-              健康度分數（0–100）以地塊的<b>最近作業記錄</b>與<b>作物狀態</b>為基礎計算：
-              <br/>• <b>初始分數</b>：依據地塊狀態設定初始分（運作中 80 分、維護中 60 分、休耕 40 分）
-              <br/>• <b>作業加分機制</b>：施肥 +5、噴藥 +3、修剪 +4、除草 +2、套袋 +3、採收 +2（7 天內有效）
-              <br/>• <b>時效衰減</b>：若地塊超過 30 天未作業，每 10 天扣 5 分；超過 60 天未作業則進入警告狀態（-15 分）
-              <br/>• <b>成本效益加權</b>：近 30 天總作業成本低於 500 元視為低投入，扣 3 分；成本 &gt;2000 元且健康度 &lt;70 視為投入不當，扣 5 分
-              <br/>• <b>臨時調整</b>：檢查地塊的 crop（作物種類）與當前季節是否匹配，若錯季種植扣 5 分
-            </p>
-          </div>
-          <div>
-            <h4 className="font-semibold text-gray-800 mb-1">決策建議生成規則</h4>
-            <p className="text-xs text-gray-600 leading-relaxed">
-              建議內容依<b>健康度分級</b>與<b>地塊狀態</b>雙重判斷：
-              <br/>• <b>健康區間（≥85）+ 運作中</b>：維持每 7 天巡檢、觀測病蟲害即可
-              <br/>• <b>注意區間（60–84）</b>：建議施肥/葉面追肥、加強病蟲監測、檢查灌溉均勻性
-              <br/>• <b>警告區間（&lt;60）或維護中</b>：優先處理病枝修剪、檢查排水/灌溉、必要時施藥
-              <br/>• <b>狀態=維護中</b>：建議完成修剪/補苗/支架檢查後轉為運作中
-              <br/>• <b>狀態=休耕</b>：規劃覆蓋作物或土壤改良，提高下季健康度
-            </p>
-          </div>
-          <p className="text-xs text-gray-500 border-t border-gray-200 pt-2">依據：頁面內 getPlotAdvice() 決策規則、地塊屬性（status、health）、近期農務日誌（logs）。</p>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">健康度計算說明</h3>
+        <div className="text-sm text-gray-700 space-y-2">
+          <p>
+            健康度分數（0–100）以最近作業與作物狀態計算；初始分依地塊狀態設定，近 7 天作業加分、長期未作業扣分，並考量成本效益與季節匹配度。
+          </p>
+          <p className="text-xs text-gray-500">此頁不提供預設建議，請使用上方「諮詢 AI」取得具體建議並自動紀錄時間。</p>
         </div>
       </div>
     </div>

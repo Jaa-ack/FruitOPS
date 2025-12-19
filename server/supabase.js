@@ -246,7 +246,7 @@ async function addOrder(orderData) {
   
   // 轉換 camelCase 到 snake_case
   const normalized = toSnakeCase(orderData);
-  const { id, customer_name, channel, total, status, order_items } = normalized;
+  const { id, customer_name, channel, source, total, payment_status, status, order_items } = normalized;
 
   // 產生或調整訂單編號：確保最後 8 碼為 YYYYMMDD
   const now = new Date();
@@ -264,14 +264,14 @@ async function addOrder(orderData) {
   }
   // 嘗試用傳入的 id 插入（若 orders.id 為 TEXT 會成功）
   let ins = await sb.from('orders')
-    .insert([{ id: orderId, customer_name, channel, total, status }])
+    .insert([{ id: orderId, customer_name, channel, source, total, payment_status, status }])
     .select('id')
     .single();
 
   if (ins.error) {
     // 若型別不相容（例如 DB 為 UUID），改為不指定 id 讓 DB 產生
     const alt = await sb.from('orders')
-      .insert([{ customer_name, channel, total, status }])
+      .insert([{ customer_name, channel, source, total, payment_status, status }])
       .select('id')
       .single();
     if (alt.error) throw alt.error;
@@ -286,7 +286,8 @@ async function addOrder(orderData) {
       product_name: item.product_name,
       grade: item.grade,
       quantity: item.quantity,
-      price: item.price
+      price: item.price,
+      origin_plot_id: item.origin_plot_id
     }));
     const itemsRes = await sb.from('order_items').insert(payload);
     if (itemsRes.error) throw itemsRes.error;
@@ -360,12 +361,15 @@ async function getProductGrades() {
 async function upsertInventoryItem(inventoryData) {
   const sb = initSupabase(); if (!sb) throw new Error('Supabase not configured');
   const normalized = toSnakeCase(inventoryData);
-  
-  const { error } = await sb.from('inventory').upsert([{
+  const { error } = await sb.from('inventory').upsert([{ 
     product_name: normalized.product_name,
     grade: normalized.grade,
     quantity: normalized.quantity,
-    location_id: normalized.location_id
+    location_id: normalized.location_id,
+    harvest_date: normalized.harvest_date,
+    package_spec: normalized.package_spec,
+    batch_id: normalized.batch_id,
+    origin_plot_id: normalized.origin_plot_id
   }], { 
     onConflict: 'product_name,grade,location_id'
   });

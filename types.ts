@@ -30,6 +30,12 @@ export interface FarmLog {
     location_id?: string; // UUID FK to storage_locations
     harvestDate?: string;
     harvest_date?: string;
+    packageSpec?: string;
+    package_spec?: string;
+    batchId?: string;
+    batch_id?: string;
+    originPlotId?: string;
+    origin_plot_id?: string;
   }
   
   // Orders
@@ -38,6 +44,8 @@ export interface FarmLog {
     customerName?: string;
     customer_name?: string; // from backend JOIN
     channel: 'Line' | 'Google Form' | 'Phone' | 'Direct' | 'Wholesale';
+    source?: 'GoogleForm' | 'LINE' | 'Phone' | 'Fax' | 'WalkIn' | 'Other';
+    payment_status?: 'Unpaid' | 'Paid' | 'Refunded' | 'Partial';
     items: { productName: string; grade: string; qty: number; price: number }[];
     total: number;
     status: 'Pending' | 'Confirmed' | 'Shipped' | 'Completed' | 'Cancelled';
@@ -49,6 +57,8 @@ export interface FarmLog {
     id: string;
     name: string;
     phone: string;
+    region?: string;
+    preferredChannel?: 'Direct' | 'Line' | 'Phone' | 'Wholesale';
     segment: 'VIP' | 'Stable' | 'Regular' | 'New' | 'At Risk'; // RFM Segment
     totalSpent: number;
     lastOrderDate: string;

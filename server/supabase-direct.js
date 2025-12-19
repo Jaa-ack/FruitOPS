@@ -340,7 +340,9 @@ async function addOrder(orderData) {
     id: orderData.id,
     customer_name: orderData.customer_name,
     channel: orderData.channel,
+    source: orderData.source,
     total: orderData.total,
+    payment_status: orderData.payment_status,
     status: orderData.status
   };
   
@@ -358,7 +360,8 @@ async function addOrder(orderData) {
       product_name: item.product_name,
       grade: item.grade,
       quantity: item.quantity,
-      price: item.price
+      price: item.price,
+      origin_plot_id: item.origin_plot_id
     }));
     
     await fetchSupabase('/order_items', {
@@ -371,13 +374,16 @@ async function addOrder(orderData) {
 }
 
 async function getInventoryV2() {
-  const data = await fetchSupabase('/inventory?select=id,product_name,grade,quantity,harvest_date,location_id,storage_locations(id,name,type)');
+  const data = await fetchSupabase('/inventory?select=id,product_name,grade,quantity,harvest_date,package_spec,batch_id,origin_plot_id,location_id,storage_locations(id,name,type)');
   return data.map(item => ({
     id: item.id,
     productName: item.product_name,
     grade: item.grade,
     quantity: item.quantity,
     harvestDate: item.harvest_date,
+    packageSpec: item.package_spec,
+    batchId: item.batch_id,
+    originPlotId: item.origin_plot_id,
     location: item.storage_locations?.name || '未指定',
     locationId: item.storage_locations?.id || item.location_id
   }));
@@ -461,7 +467,10 @@ async function upsertInventoryItem(inventoryData) {
       grade,
       quantity: addQty,
       location_id: locationId,
-      harvest_date: normalized.harvest_date
+      harvest_date: normalized.harvest_date,
+      package_spec: normalized.package_spec,
+      batch_id: normalized.batch_id,
+      origin_plot_id: normalized.origin_plot_id
     })
   });
 
