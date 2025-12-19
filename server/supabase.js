@@ -262,6 +262,7 @@ async function addOrder(orderData) {
   } else if (!orderId.endsWith(yyyymmdd)) {
     orderId = `${orderId}-${yyyymmdd}`;
   }
+  
   // 嘗試用傳入的 id 插入（若 orders.id 為 TEXT 會成功）
   let ins = await sb.from('orders')
     .insert([{ id: orderId, customer_name, channel, total, status }])
@@ -270,6 +271,7 @@ async function addOrder(orderData) {
 
   if (ins.error) {
     // 若型別不相容（例如 DB 為 UUID），改為不指定 id 讓 DB 產生
+    console.log('Order ID as TEXT failed, falling back to UUID auto-gen:', ins.error.message);
     const alt = await sb.from('orders')
       .insert([{ customer_name, channel, total, status }])
       .select('id')

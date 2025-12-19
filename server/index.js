@@ -514,14 +514,16 @@ app.post('/api/orders', async (req, res) => {
       return res.status(201).json({ ok: true, orderId });
     }
 
-    await getSupabaseClient().addOrder(orderData);
+    const result = await getSupabaseClient().addOrder(orderData);
+    const actualOrderId = result.id || orderId;
+    
     // 確保客戶存在（以名稱為準則 upsert）
     try {
       await getSupabaseClient().upsertCustomerByName({ name: orderData.customer_name, phone: '', segment: 'New' });
     } catch (e) {
       console.warn('Upsert customer after order failed:', e.message);
     }
-    res.status(201).json({ ok: true, orderId });
+    res.status(201).json({ ok: true, orderId: actualOrderId });
   } catch (err) {
     console.error('POST /api/orders error', err);
     res.status(500).json({ error: '新增訂單失敗', details: err.message });

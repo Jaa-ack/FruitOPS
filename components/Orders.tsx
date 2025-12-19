@@ -16,10 +16,11 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
   const [newOrder, setNewOrder] = useState({
     customerName: '',
     channel: 'Direct',
-    total: 0
+      status: 'Pending',
+      total: 0
   });
   const [newItems, setNewItems] = useState([
-    { productName: '', grade: 'A', qty: 1, price: 0, originPlotId: '' }
+      { productName: '', grade: 'A', qty: 1, price: 0 }
   ]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [productNames, setProductNames] = useState<string[]>([]);
@@ -133,7 +134,8 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
         { key: 'Pending', label: '待處理' },
         { key: 'Confirmed', label: '已確認' },
         { key: 'Shipped', label: '已出貨' },
-        { key: 'Completed', label: '已完成' },
+      { key: 'Completed', label: '已完成' },
+      { key: 'Cancelled', label: '已取消' },
     ];
 
     const statusTransitions: Record<string, string[]> = {
@@ -305,8 +307,7 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
         productName: i.productName,
         grade: i.grade || 'A',
         qty: Number(i.qty) || 1,
-        price: Number(i.price) || 0,
-        originPlotId: i.originPlotId || ''
+        price: Number(i.price) || 0
       }));
 
     if (normalizedItems.length === 0) {
@@ -315,11 +316,12 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
     }
 
     const total = normalizedItems.reduce((sum, item) => sum + item.qty * (item.price || 0), 0);
+    const customerName = (newOrder.customerName || '').trim() || '未命名客戶';
 
     const payload = {
-      customerName: newOrder.customerName || '未命名客戶',
+      customerName,
       channel: newOrder.channel,
-      status: 'Pending',
+      status: newOrder.status || 'Pending',
       items: normalizedItems,
       total
     };
@@ -332,8 +334,8 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        setNewOrder({ customerName: '', channel: 'Direct', total: 0 });
-          setNewItems([{ productName: '', grade: 'A', qty: 1, price: 0, originPlotId: '' }]);
+        setNewOrder({ customerName: '', channel: 'Direct', status: 'Pending', total: 0 });
+          setNewItems([{ productName: '', grade: 'A', qty: 1, price: 0 }]);
         onOrderChange?.();
         
         // Toast 通知
@@ -355,7 +357,7 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
   };
 
   const addItemRow = () => {
-    setNewItems(items => [...items, { productName: '', grade: 'A', qty: 1, price: 0, originPlotId: '' }]);
+    setNewItems(items => [...items, { productName: '', grade: 'A', qty: 1, price: 0 }]);
   };
 
   const removeItemRow = (idx: number) => {
@@ -574,7 +576,7 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
       <div className="bg-white border border-gray-200 rounded-lg p-4 w-full">
         <h3 className="font-semibold text-gray-800 mb-3">快速新增訂單</h3>
         <form onSubmit={handleCreateOrder} className="space-y-3 text-sm">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
               <label className="text-xs text-gray-600 mb-1 block">客戶名稱（必填）</label>
               <input
@@ -604,8 +606,19 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                 <option value="Wholesale">批發</option>
               </select>
             </div>
-            {/* 移除來源與付款狀態欄位 */}
-            <div className="flex items-end">
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">訂單狀態</label>
+              <select
+                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                value={newOrder.status}
+                onChange={(e) => setNewOrder({ ...newOrder, status: e.target.value })}
+              >
+                {statusOptions.filter(s => s.key !== 'All').map(s => (
+                  <option key={s.key} value={s.key}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end md:col-span-1">
               <div className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                 <p className="text-xs text-gray-500">總金額</p>
                 <p className="font-bold text-lg text-brand-600">
@@ -616,16 +629,15 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
           </div>
 
           <div className="space-y-2">
-              <div className="grid grid-cols-6 gap-2 text-xs text-gray-600 font-medium px-1">
+              <div className="grid grid-cols-5 gap-2 text-xs text-gray-600 font-medium px-1">
               <div>商品</div>
               <div>等級</div>
               <div>數量</div>
               <div>單價 (NT$)</div>
-              <div>來源地塊（選填）</div>
               <div className="text-center">操作</div>
             </div>
             {newItems.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center">
                 <select
                   className="border border-gray-300 rounded-md px-3 py-2"
                   value={item.productName || ''}
@@ -677,13 +689,6 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                   value={item.price}
                   onChange={(e) => updateItem(idx, 'price', Number(e.target.value))}
                   required
-                />
-                <input
-                  type="text"
-                  className="border border-gray-300 rounded-md px-3 py-2"
-                  placeholder="例如 P-001"
-                  value={item.originPlotId}
-                  onChange={(e) => updateItem(idx, 'originPlotId', e.target.value)}
                 />
                 <div className="flex gap-1 justify-center">
                   {newItems.length === 1 ? (

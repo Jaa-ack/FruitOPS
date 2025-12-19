@@ -191,7 +191,7 @@ const App: React.FC = () => {
             )}
             <div className="max-w-7xl mx-auto pb-20">
               <Routes>
-                <Route path="/" element={<Dashboard orders={orders} inventory={inventory} />} />
+                <Route path="/" element={<Dashboard orders={orders} inventory={inventory} customers={customers} />} />
                 <Route path="/production" element={<Production plots={plots} logs={logs} onAddLog={handleAddLog} onUpdateLog={handleUpdateLog} />} />
                 <Route path="/inventory" element={<Inventory inventory={inventory} onInventoryChange={handleInventoryChange} />} />
                 <Route path="/orders" element={<Orders orders={orders} onOrderChange={handleOrderChange} />} />

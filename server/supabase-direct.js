@@ -335,21 +335,37 @@ async function updateCustomerSegment(customerId, segment) {
 }
 
 async function addOrder(orderData) {
-  // Add order first
+  // Prepare order data
   const orderInsert = {
-    id: orderData.id,
     customer_name: orderData.customer_name,
     channel: orderData.channel,
     total: orderData.total,
     status: orderData.status
   };
   
-  const orders = await fetchSupabase('/orders', {
-    method: 'POST',
-    body: JSON.stringify(orderInsert)
-  });
+  // Try with custom ID first (if database supports TEXT IDs)
+  let orderId = orderData.id;
+  let orders;
   
-  const orderId = orders[0]?.id || orderData.id;
+  try {
+    orders = await fetchSupabase('/orders', {
+      method: 'POST',
+      body: JSON.stringify({ ...orderInsert, id: orderId })
+    });
+    orderId = orders[0]?.id || orderId;
+  } catch (err) {
+    // If TEXT ID fails (e.g., database expects UUID), retry without ID
+    if (err.message.includes('uuid') || err.message.includes('22P02')) {
+      console.log('Order ID as TEXT failed, falling back to UUID auto-gen');
+      orders = await fetchSupabase('/orders', {
+        method: 'POST',
+        body: JSON.stringify(orderInsert)
+      });
+      orderId = orders[0]?.id;
+    } else {
+      throw err;
+    }
+  }
   
   // Add order items
   if (orderData.order_items && orderData.order_items.length > 0) {
