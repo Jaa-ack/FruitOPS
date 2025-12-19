@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Customer } from '../types';
-import { User, Award, Clock, Search, Zap, Pencil, Smartphone } from 'lucide-react';
+import { User, Award, Clock, Search, Zap, Pencil, Smartphone, Lock } from 'lucide-react';
 import { getGlobalToast } from '../services/toastHelpers';
 
 interface CRMProps {
@@ -17,6 +17,7 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
   const [calculating, setCalculating] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<{ name: string; phone: string; segment: string; region: string; preferredChannel: string }>({ name: '', phone: '', segment: 'Regular', region: '', preferredChannel: '' });
+  const [lockForm, setLockForm] = useState<{ locked: boolean; reason: string }>({ locked: false, reason: '' });
   
   // 從 URL 參數獲取客戶名稱（來自訂單跳轉）
   const highlightedCustomer = useMemo(() => {
@@ -340,7 +341,7 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                 <p className="text-xs text-gray-500 mb-2">{selectedCustomer.region || '未提供地區'}</p>
                 <button
                   className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md transition"
-                  onClick={() => { setEditing(true); setEditForm({ name: selectedCustomer.name, phone: selectedCustomer.phone || '', segment: selectedCustomer.segment || 'Regular', region: selectedCustomer.region || '', preferredChannel: selectedCustomer.preferredChannel || '' }); }}
+                  onClick={() => { setEditing(true); setEditForm({ name: selectedCustomer.name, phone: selectedCustomer.phone || '', segment: selectedCustomer.segment || 'Regular', region: selectedCustomer.region || '', preferredChannel: selectedCustomer.preferredChannel || '' }); setLockForm({ locked: !!selectedCustomer.rfmLocked, reason: '' }); }}
                   title="編輯顧客資訊"
                 >
                   <Pencil size={14} /> 編輯基本資訊
@@ -385,6 +386,9 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                         <p>累積消費：<b className="text-blue-600">NT$ {Number(stats.total || 0).toLocaleString()}</b></p>
                         <p>訂單數量：<b>{stats.count}</b> 筆</p>
                         <p>上次購買：{stats.lastDate ? formatDateTime(stats.lastDate) : '未紀錄'}</p>
+                        {selectedCustomer.rfmLocked && (
+                          <p className="flex items-center gap-1 text-amber-700"><Lock size={14} className="text-amber-600"/> 已鎖定分級（不受自動重算）</p>
+                        )}
                       </div>
                     </div>
                     
@@ -502,6 +506,47 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                       <option value="At Risk">流失風險</option>
                     </select>
                   </label>
+                  <div className="mt-2 p-3 bg-white rounded border border-blue-100">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" className="accent-amber-600" checked={lockForm.locked} onChange={(e) => setLockForm(f => ({ ...f, locked: e.target.checked }))} />
+                      <span className="text-gray-800">鎖定此客戶分級（不受 RFM 自動重算影響）</span>
+                    </label>
+                    {lockForm.locked && (
+                      <div className="mt-2">
+                        <span className="text-xs text-gray-700 font-medium">鎖定原因（選填）</span>
+                        <input className="mt-1 w-full border border-gray-300 rounded px-3 py-2" placeholder="例如：重點 VIP、合約價固定" value={lockForm.reason} onChange={(e) => setLockForm(f => ({ ...f, reason: e.target.value }))} />
+                      </div>
+                    )}
+                    <div className="flex justify-end mt-2">
+                      <button
+                        className="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded"
+                        onClick={async () => {
+                          if (!selectedCustomer) return;
+                          try {
+                            const res = await fetch(`/api/customers/${selectedCustomer.id}/segmentation-lock`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ locked: lockForm.locked, reason: lockForm.reason })
+                            });
+                            if (res.ok) {
+                              const data = await res.json();
+                              setSelectedCustomer(prev => prev ? { ...prev, rfmLocked: lockForm.locked, rfmLockedReason: lockForm.locked ? lockForm.reason : null, rfmLockedAt: lockForm.locked ? new Date().toISOString() : null } as Customer : prev);
+                              const toast = getGlobalToast();
+                              toast.addToast('success', lockForm.locked ? '已鎖定分級' : '已取消鎖定', lockForm.locked ? '此客戶將不受 RFM 自動重算影響' : '此客戶將回復為可被自動重算', 3500);
+                            } else {
+                              const toast = getGlobalToast();
+                              toast.addToast('error', '設定失敗', '伺服器返回錯誤', 3500);
+                            }
+                          } catch (e) {
+                            const toast = getGlobalToast();
+                            toast.addToast('error', '設定失敗', '網路錯誤', 3500);
+                          }
+                        }}
+                      >
+                        {lockForm.locked ? '套用鎖定' : '取消鎖定'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex justify-end gap-2 mt-4">
                   <button className="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md transition" onClick={() => setEditing(false)}>取消</button>

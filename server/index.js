@@ -33,7 +33,7 @@ function getSupabaseClient() {
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
-const REQ_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 12000);
+const REQ_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS || 40000);
 // In serverless environments (Vercel), always disable local DB fallback unless explicitly set to 0
 const DISABLE_LOCAL_DB = process.env.VERCEL 
   ? (process.env.DISABLE_LOCAL_DB !== '0')  // Vercel: default to true unless explicitly disabled
@@ -692,12 +692,44 @@ app.post('/api/customers/segmentation/apply', async (req, res) => {
     }
     
     const client = getSupabaseClient();
-    await client.updateCustomerSegments(segmentUpdates);
+    const result = await client.updateCustomerSegments(segmentUpdates);
+    const updated = Number(result?.updated || 0);
+    const skipped = Number(result?.skippedLocked || 0);
+    const msg = skipped > 0
+      ? `已更新 ${updated} 位客戶分級（${skipped} 位已鎖定，略過）`
+      : `已更新 ${updated} 位客戶分級`;
     
-    res.json({ ok: true, message: `已更新 ${segmentUpdates.length} 位客戶分級` });
+    res.json({ ok: true, message: msg, details: result });
   } catch (err) {
     console.error('POST /api/customers/segmentation/apply error', err);
     res.status(500).json({ error: '客戶分級應用失敗', details: err.message });
+  }
+});
+
+// 新增端點：設定/取消單一客戶的 RFM 分級鎖定
+app.put('/api/customers/:id/segmentation-lock', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { locked, reason } = req.body || {};
+    if (!SUPABASE_READY) {
+      if (DISABLE_LOCAL_DB) return res.status(503).json({ error: 'Supabase not configured' });
+      const db = await ensureLocalDB();
+      db.data.customers = db.data.customers || [];
+      const idx = db.data.customers.findIndex(c => c.id === id);
+      if (idx < 0) return res.status(404).json({ error: '客戶不存在' });
+      const nowIso = new Date().toISOString();
+      db.data.customers[idx].rfmLocked = !!locked;
+      db.data.customers[idx].rfmLockedReason = locked ? (reason || null) : null;
+      db.data.customers[idx].rfmLockedAt = locked ? nowIso : null;
+      await db.write();
+      return res.json({ ok: true, customer: db.data.customers[idx] });
+    }
+    const client = getSupabaseClient();
+    const updated = await client.updateCustomerLock(id, !!locked, reason || null);
+    res.json({ ok: true, customer: updated });
+  } catch (err) {
+    console.error('PUT /api/customers/:id/segmentation-lock error', err);
+    res.status(500).json({ error: '設定分級鎖定失敗', details: err.message });
   }
 });
 
@@ -828,7 +860,7 @@ app.post('/api/ai', async (req, res) => {
     const ai = new GoogleGenAI({ apiKey });
     const fullPrompt = `你是農業營運顧問，請以繁體中文回答並保持簡潔。Context: ${JSON.stringify(context ?? {})}\nUser Query: ${prompt}`;
     const started = Date.now();
-    const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 10000);
+    const timeoutMs = Number(process.env.AI_TIMEOUT_MS || 30000);
     const result = await withTimeout(
       ai.models.generateContent({ model: 'gemini-2.5-flash', contents: fullPrompt }),
       timeoutMs

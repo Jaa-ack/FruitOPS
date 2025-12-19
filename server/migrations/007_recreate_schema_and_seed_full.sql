@@ -327,4 +327,9 @@ INSERT INTO logs (date, plot_id, activity, crop_type, notes, cost, worker) VALUE
  (NOW() - INTERVAL '11 days', (SELECT id FROM plots WHERE name='東側試驗田'), 'Pesticide','蜜蘋果','低劑量生物性防治', 900, '小芳'),
  (NOW() - INTERVAL '9 days',  (SELECT id FROM plots WHERE name='西側老園'),   'Pruning',  '柿子','修剪更新樹勢', 1300, '全員');
 
+-- 新增：RFM 分級鎖定欄位（若不存在）
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS rfm_locked BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS rfm_locked_reason TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS rfm_locked_at TIMESTAMPTZ;
+
 COMMIT;

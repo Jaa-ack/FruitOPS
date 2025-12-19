@@ -62,6 +62,9 @@ export interface FarmLog {
     segment: 'VIP' | 'Stable' | 'Regular' | 'New' | 'At Risk'; // RFM Segment
     totalSpent: number;
     lastOrderDate: string;
+    rfmLocked?: boolean;
+    rfmLockedReason?: string | null;
+    rfmLockedAt?: string | null;
   }
   
   export interface DashboardMetrics {

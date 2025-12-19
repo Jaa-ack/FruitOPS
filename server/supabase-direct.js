@@ -303,15 +303,28 @@ async function calculateAndApplyCustomerSegmentation() {
  */
 async function updateCustomerSegments(segmentUpdates = []) {
   try {
-    // Supabase REST 不支援不同值的批量 PATCH，逐筆更新
-    for (const upd of (segmentUpdates || [])) {
-      if (!upd || !upd.id) continue;
+    const updates = Array.isArray(segmentUpdates) ? segmentUpdates.filter(u => u && u.id) : [];
+    if (updates.length === 0) return { ok: true, updated: 0, skippedLocked: 0 };
+
+    // 先查詢這批客戶的鎖定狀態
+    const ids = updates.map(u => u.id);
+    const rows = await fetchSupabase(`/customers?id=in.(${ids.map(id => encodeURIComponent(id)).join(',')})&select=id,rfm_locked`);
+    const lockedSet = new Set((rows || []).filter(r => r.rfm_locked).map(r => r.id));
+
+    let updated = 0;
+    let skippedLocked = 0;
+    for (const upd of updates) {
+      if (lockedSet.has(upd.id)) {
+        skippedLocked += 1;
+        continue;
+      }
       await fetchSupabase(`/customers?id=eq.${encodeURIComponent(upd.id)}`, {
         method: 'PATCH',
         body: JSON.stringify({ segment: upd.segment })
       });
+      updated += 1;
     }
-    return { ok: true };
+    return { ok: true, updated, skippedLocked };
   } catch (err) {
     console.error('[Segmentation] Batch update failed:', err);
     throw err;
@@ -330,6 +343,24 @@ async function updateCustomerSegment(customerId, segment) {
     return result[0] || { ok: true };
   } catch (err) {
     console.error('[Segmentation] Update failed:', err);
+    throw err;
+  }
+}
+
+async function updateCustomerLock(customerId, locked, reason) {
+  try {
+    const payload = {
+      rfm_locked: !!locked,
+      rfm_locked_reason: locked ? (reason || null) : null,
+      rfm_locked_at: locked ? new Date().toISOString() : null
+    };
+    const result = await fetchSupabase(`/customers?id=eq.${encodeURIComponent(customerId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+    return result[0] ? toCamelCase(result[0]) : null;
+  } catch (err) {
+    console.error('[Segmentation] Update lock failed:', err);
     throw err;
   }
 }
@@ -388,16 +419,28 @@ async function addOrder(orderData) {
 }
 
 async function getInventoryV2() {
+  // 拉取庫存與儲位名稱
   const data = await fetchSupabase('/inventory?select=id,product_name,grade,quantity,harvest_date,package_spec,batch_id,origin_plot_id,location_id,storage_locations(id,name,type)');
+  // 另外拉取地塊名稱對照（避免缺乏 FK 無法直接 JOIN）
+  let plotMap = {};
+  try {
+    const plots = await fetchSupabase('/plots?select=id,name');
+    plotMap = (plots || []).reduce((acc, p) => { acc[p.id] = p.name; return acc; }, {});
+  } catch (e) {
+    // 忽略 plots 取用失敗，維持空 map
+  }
+
   return data.map(item => ({
     id: item.id,
     productName: item.product_name,
     grade: item.grade,
     quantity: item.quantity,
+    // 不主動暴露批次與規格給前端 UI（僅保留於 API 中如需追溯）
     harvestDate: item.harvest_date,
     packageSpec: item.package_spec,
     batchId: item.batch_id,
     originPlotId: item.origin_plot_id,
+    originPlotName: item.origin_plot_id ? (plotMap[item.origin_plot_id] || null) : null,
     location: item.storage_locations?.name || '未指定',
     locationId: item.storage_locations?.id || item.location_id
   }));
@@ -606,6 +649,7 @@ module.exports = {
   calculateAndApplyCustomerSegmentation,
   updateCustomerSegments,
   updateCustomerSegment,
+  updateCustomerLock,
   
   // Utility functions
   fetchSupabase,

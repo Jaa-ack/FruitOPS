@@ -10,9 +10,8 @@ interface InventoryDetail {
   location: string;
   locationId: string;
   harvestDate?: string;
-  packageSpec?: string;
-  batchId?: string;
   originPlotId?: string;
+  originPlotName?: string | null;
 }
 
 interface InventorySummary {
@@ -40,10 +39,10 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
     quantity: 0,
     locationId: '',
     harvestDate: '',
-    packageSpec: '',
-    batchId: '',
     originPlotId: ''
   });
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [recommendModal, setRecommendModal] = useState<{ open: boolean; title: string; channels: string[] }>({ open: false, title: '', channels: [] });
 
   // 獲取數據
   useEffect(() => {
@@ -53,11 +52,12 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [summaryRes, detailRes, locRes, gradesRes] = await Promise.all([
+      const [summaryRes, detailRes, locRes, gradesRes, customersRes] = await Promise.all([
         fetch('/api/inventory-summary'),
         fetch('/api/inventory-detail'),
         fetch('/api/storage-locations'),
-        fetch('/api/product-grades')
+        fetch('/api/product-grades'),
+        fetch('/api/customers')
       ]);
 
       if (summaryRes.ok) {
@@ -81,13 +81,13 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
           location: row.location ?? row.location_name ?? '',
           locationId: row.locationId ?? row.location_id ?? '',
           harvestDate: row.harvestDate ?? row.harvest_date,
-          packageSpec: row.packageSpec ?? row.package_spec,
-          batchId: row.batchId ?? row.batch_id,
-          originPlotId: row.originPlotId ?? row.origin_plot_id
+          originPlotId: row.originPlotId ?? row.origin_plot_id,
+          originPlotName: row.originPlotName ?? row.origin_plot_name ?? null
         })) : [];
         setDetailData(detail);
       }
       if (locRes.ok) setStorageLocations(await locRes.json());
+      if (customersRes.ok) setCustomers(await customersRes.json());
       if (gradesRes.ok) {
         const gradeData = await gradesRes.json();
         if (Array.isArray(gradeData)) {
@@ -133,15 +133,13 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
           quantity: Number(formData.quantity) || 0,
           locationId: formData.locationId,
           harvestDate: formData.harvestDate || undefined,
-          packageSpec: formData.packageSpec || undefined,
-          batchId: formData.batchId || undefined,
           originPlotId: formData.originPlotId || undefined
         })
       });
 
       if (response.ok) {
         setShowAddForm(false);
-        setFormData({ productName: '', grade: 'A', quantity: 0, locationId: '', harvestDate: '', packageSpec: '', batchId: '', originPlotId: '' });
+        setFormData({ productName: '', grade: 'A', quantity: 0, locationId: '', harvestDate: '', originPlotId: '' });
         await fetchData();
         onInventoryChange?.();
         
@@ -221,10 +219,9 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
         </button>
       </div>
 
-      {/* 庫存時效與通路配置建議（提升到頁面上方） */}
+      {/* 庫存時效與通路配置建議（僅保留新鮮期/保鮮期，點擊可查看建議通路客戶） */}
       {(() => {
         const totalInventory = (summarySummary || []).reduce((sum, s) => sum + (Number(s.totalQuantity) || 0), 0);
-        const avgStock = (summarySummary || []).length > 0 ? Math.round(totalInventory / summarySummary.length) : 0;
         const now = new Date();
         const freshItems = (detailData || []).filter(d => {
           if (!d.harvestDate) return false;
@@ -238,17 +235,10 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
           const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
           return agingDays > 7 && agingDays <= 14;
         });
-        const displayItems = (detailData || []).filter(d => {
-          if (!d.harvestDate) return false;
-          const harvestDate = new Date(d.harvestDate);
-          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
-          return agingDays > 14;
-        });
         // 取唯一的產品名稱，避免重複（例如同產品不同級別導致重複）
         const topNames = (items: any[]) => Array.from(new Set(items.map(i => i.productName))).slice(0, 3).join('、');
         const freshQty = freshItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
         const preservationQty = preservationItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-        const displayQty = displayItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
         // 通路中文名稱（與訂單管理一致）
         const channelDisplay = (ch: string) => {
           switch(ch) {
@@ -260,10 +250,8 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
           }
         };
         const insights = [
-          { label: '新鮮期庫存（≤7天）', value: `${freshQty} 單位`, color: 'text-green-600', advice: freshQty > 0 ? `優先配給 ${channelDisplay('Direct')}／${channelDisplay('Line')} 通路，主打 A/B 級品` : '無新鮮採收，依靠冷藏庫存' },
-          { label: '保鮮期庫存（8-14天）', value: `${preservationQty} 單位`, color: 'text-blue-600', advice: preservationQty > 0 ? `適合 ${channelDisplay('Phone')}／${channelDisplay('Wholesale')} 組合銷售` : '無保鮮期庫存' },
-          { label: '展示期庫存（>14天）', value: `${displayQty} 單位`, color: displayQty > 100 ? 'text-orange-600' : 'text-gray-600', advice: displayQty > 100 ? '進入臨期，建議促銷或加工通路處理' : displayQty > 0 ? '少量臨期品，可用於樣品展示' : '無臨期品' },
-          { label: '平均庫存/品項', value: `${avgStock} 單位`, color: 'text-purple-600', advice: avgStock < 30 ? '品項庫存偏低，關注採收計畫' : '庫存分佈健康' }
+          { key: 'fresh', label: '新鮮期庫存（≤7天）', value: `${freshQty} 單位`, color: 'text-green-600', advice: freshQty > 0 ? `優先配給 ${channelDisplay('Direct')}／${channelDisplay('Line')} 通路，主打 A/B 級品` : '無新鮮採收，依靠冷藏庫存', channels: ['Direct','Line'] },
+          { key: 'preserve', label: '保鮮期庫存（8-14天）', value: `${preservationQty} 單位`, color: 'text-blue-600', advice: preservationQty > 0 ? `適合 ${channelDisplay('Phone')}／${channelDisplay('Wholesale')} 組合銷售` : '無保鮮期庫存', channels: ['Phone','Wholesale'] }
         ];
         return (
           <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-xl shadow-sm border border-emerald-100">
@@ -275,30 +263,27 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
                 依據：採收日期（harvest_date）計算時效分期（新鮮期 ≤7天、保鮮期 8-14天、展示期 &gt;14天），結合通路特性建議配置。
               <br/><b>通路建議</b>：{channelDisplay('Direct')}／{channelDisplay('Line')} 優先新鮮期 A/B 級；{channelDisplay('Phone')}／{channelDisplay('Wholesale')} 適合保鮮期組合；展示期建議促銷或加工。
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {insights.map((ins, idx) => (
-                <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <button key={idx} className="text-left bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:border-emerald-300 focus:ring-2 focus:ring-emerald-200" onClick={() => setRecommendModal({ open: true, title: ins.label + '：建議通路客戶', channels: ins.channels })}>
                   <div className="flex items-start justify-between mb-2">
                     <p className="text-sm text-gray-600 font-medium">{ins.label}</p>
                     <span className={`text-lg font-bold ${ins.color}`}>{ins.value}</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-2 border-t border-gray-100 pt-2">💡 {ins.advice}</p>
-                </div>
+                </button>
               ))}
             </div>
             <div className="mt-4 bg-white p-4 rounded-lg border border-emerald-200">
               <h4 className="text-sm font-semibold text-gray-700 mb-2">本週執行建議</h4>
               <div className="space-y-1 text-xs text-gray-600">
                 {freshQty > 0 && (
-                  <p>• <b>新鮮期優先</b>：將 {topNames(freshItems)} 等新鮮品優先配給 {channelDisplay('Direct')}／{channelDisplay('Line')} 通路</p>
+                  <p>• <b>新鮮期優先</b>：將 {topNames(freshItems)} 等新鮮品優先配給 Direct／LINE 通路</p>
                 )}
                 {preservationQty > 100 && (
-                  <p>• <b>保鮮期促銷</b>：{topNames(preservationItems)} 進入保鮮期，適合 {channelDisplay('Phone')}／{channelDisplay('Wholesale')} 組合銷售</p>
+                  <p>• <b>保鮮期促銷</b>：{topNames(preservationItems)} 進入保鮮期，適合 Phone／Wholesale 組合銷售</p>
                 )}
-                {displayQty > 50 && (
-                  <p className="text-orange-600">• <b>臨期處理</b>：{topNames(displayItems)} 已逾 14 天，建議促銷或轉加工通路</p>
-                )}
-                {freshQty === 0 && preservationQty === 0 && displayQty === 0 && (
+                {(freshQty === 0 && preservationQty === 0) && (
                   <p className="text-gray-500">• 無庫存或無採收日期記錄，請確保新入庫品項填寫 harvest_date</p>
                 )}
               </div>
@@ -363,21 +348,7 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
             />
             <input
               type="text"
-              placeholder="包裝規格（選填）"
-              value={formData.packageSpec}
-              onChange={(e) => setFormData({ ...formData, packageSpec: e.target.value })}
-              className="p-2 border rounded"
-            />
-            <input
-              type="text"
-              placeholder="批次編號（選填）"
-              value={formData.batchId}
-              onChange={(e) => setFormData({ ...formData, batchId: e.target.value })}
-              className="p-2 border rounded"
-            />
-            <input
-              type="text"
-              placeholder="來源地塊（選填，例如 P-001）"
+              placeholder="來源地塊ID（選填，顯示時會轉為名稱）"
               value={formData.originPlotId}
               onChange={(e) => setFormData({ ...formData, originPlotId: e.target.value })}
               className="p-2 border rounded"
@@ -463,16 +434,9 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
                                   {items.map(item => (
                                     <div key={item.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
                                       <div className="flex flex-col text-sm">
-                                        <span>
-                                          📦 {item.location}
-                                          {item.harvestDate && <span className="text-gray-500 text-xs"> ({item.harvestDate})</span>}
-                                        </span>
-                                        {(item.packageSpec || item.batchId || item.originPlotId) && (
-                                          <span className="text-xs text-gray-500">
-                                            {item.packageSpec ? `規格: ${item.packageSpec}` : ''}
-                                            {item.batchId ? ` · 批次: ${item.batchId}` : ''}
-                                            {item.originPlotId ? ` · 地塊: ${item.originPlotId}` : ''}
-                                          </span>
+                                        <span>📦 {item.location}</span>
+                                        {(item.originPlotName || item.originPlotId) && (
+                                          <span className="text-xs text-gray-500">地塊：{item.originPlotName || item.originPlotId}</span>
                                         )}
                                       </div>
                                       <span className="font-semibold text-gray-800">{item.quantity} 件</span>
@@ -561,6 +525,32 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
                 <button className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded" onClick={() => setMoveModal({ open: false, item: null })}>取消</button>
                 <button className="px-4 py-2 text-sm bg-emerald-600 text-white rounded" onClick={() => handleMoveSubmit(moveAmount, moveTarget)}>確認移動</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 建議通路客戶列表 Modal */}
+      {recommendModal.open && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setRecommendModal({ open: false, title: '', channels: [] })}>
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-gray-800">{recommendModal.title}</h3>
+              <button className="text-gray-500 hover:text-gray-700" onClick={() => setRecommendModal({ open: false, title: '', channels: [] })}>關閉</button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">顯示偏好通路為：{recommendModal.channels.join(' / ')}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {customers
+                .filter(c => recommendModal.channels.includes(c.preferredChannel || ''))
+                .map(c => (
+                  <a key={c.id} href={`#/crm?customer=${encodeURIComponent(c.name)}`} className="block p-3 border rounded-lg hover:bg-gray-50">
+                    <div className="font-medium text-gray-800">{c.name}</div>
+                    <div className="text-xs text-gray-500">電話：{c.phone || '未提供'} | 分級：{c.segment || '未分級'}</div>
+                  </a>
+              ))}
+              {customers.filter(c => recommendModal.channels.includes(c.preferredChannel || '')).length === 0 && (
+                <p className="text-sm text-gray-500">目前沒有偏好該通路的客戶</p>
+              )}
             </div>
           </div>
         </div>

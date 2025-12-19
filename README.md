@@ -393,8 +393,8 @@ SUPABASE_SERVICE_KEY=your_service_role_key_here
 GEMINI_API_KEY=your_gemini_api_key
 
 # 進階設定（通常不需調整）
-# API_TIMEOUT_MS=12000              # API 請求逾時（毫秒）
-# AI_TIMEOUT_MS=10000               # AI 請求逾時（毫秒）
+# API_TIMEOUT_MS=40000              # API 請求逾時（毫秒）
+# AI_TIMEOUT_MS=30000               # AI 請求逾時（毫秒）
 # SUPABASE_FETCH_TIMEOUT_MS=5000    # Supabase fetch 逾時（毫秒）
 # DISABLE_LOCAL_DB=0                # 設為 1 時禁用本地 lowdb fallback
 EOF
@@ -475,8 +475,8 @@ npm run preview          # 預覽建置結果
 
 **可選設定：**
 - `GEMINI_API_KEY` - Google Gemini API Key（AI 功能）
-- `API_TIMEOUT_MS` - API 請求逾時（預設 12000）
-- `AI_TIMEOUT_MS` - AI 請求逾時（預設 10000）
+- `API_TIMEOUT_MS` - API 請求逾時（預設 40000）
+- `AI_TIMEOUT_MS` - AI 請求逾時（預設 30000）
 
 ### 部署步驟
 

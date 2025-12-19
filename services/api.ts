@@ -33,7 +33,7 @@ export async function postLog(payload: any) {
 }
 
 export async function callAI(context: any, prompt: string) {
-  const res = await fetchWithTimeout('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context, prompt }) }, 12000);
+  const res = await fetchWithTimeout('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context, prompt }) }, 35000);
   if (!res.ok) {
     const rid = res.headers.get('x-request-id') || undefined;
     const text = await res.text();
