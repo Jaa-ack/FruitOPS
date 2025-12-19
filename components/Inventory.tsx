@@ -244,12 +244,24 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
           const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
           return agingDays > 14;
         });
+        // 取唯一的產品名稱，避免重複（例如同產品不同級別導致重複）
+        const topNames = (items: any[]) => Array.from(new Set(items.map(i => i.productName))).slice(0, 3).join('、');
         const freshQty = freshItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
         const preservationQty = preservationItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
         const displayQty = displayItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+        // 通路中文名稱（與訂單管理一致）
+        const channelDisplay = (ch: string) => {
+          switch(ch) {
+            case 'Direct': return '直接銷售';
+            case 'Line': return 'LINE';
+            case 'Wholesale': return '批發';
+            case 'Phone': return '電話';
+            default: return ch;
+          }
+        };
         const insights = [
-          { label: '新鮮期庫存（≤7天）', value: `${freshQty} 單位`, color: 'text-green-600', advice: freshQty > 0 ? '優先配給 Direct/Line 通路，主打 A/B 級品' : '無新鮮採收，依靠冷藏庫存' },
-          { label: '保鮮期庫存（8-14天）', value: `${preservationQty} 單位`, color: 'text-blue-600', advice: preservationQty > 0 ? '適合 Phone/Wholesale 通路，推薦組合銷售' : '無保鮮期庫存' },
+          { label: '新鮮期庫存（≤7天）', value: `${freshQty} 單位`, color: 'text-green-600', advice: freshQty > 0 ? `優先配給 ${channelDisplay('Direct')}／${channelDisplay('Line')} 通路，主打 A/B 級品` : '無新鮮採收，依靠冷藏庫存' },
+          { label: '保鮮期庫存（8-14天）', value: `${preservationQty} 單位`, color: 'text-blue-600', advice: preservationQty > 0 ? `適合 ${channelDisplay('Phone')}／${channelDisplay('Wholesale')} 組合銷售` : '無保鮮期庫存' },
           { label: '展示期庫存（>14天）', value: `${displayQty} 單位`, color: displayQty > 100 ? 'text-orange-600' : 'text-gray-600', advice: displayQty > 100 ? '進入臨期，建議促銷或加工通路處理' : displayQty > 0 ? '少量臨期品，可用於樣品展示' : '無臨期品' },
           { label: '平均庫存/品項', value: `${avgStock} 單位`, color: 'text-purple-600', advice: avgStock < 30 ? '品項庫存偏低，關注採收計畫' : '庫存分佈健康' }
         ];
@@ -261,7 +273,7 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
             </h3>
               <p className="text-xs text-gray-600 mb-4">
                 依據：採收日期（harvest_date）計算時效分期（新鮮期 ≤7天、保鮮期 8-14天、展示期 &gt;14天），結合通路特性建議配置。
-              <br/><b>通路建議</b>：Direct/Line 優先新鮮期 A/B 級；Phone/Wholesale 適合保鮮期組合；展示期建議促銷或加工。
+              <br/><b>通路建議</b>：{channelDisplay('Direct')}／{channelDisplay('Line')} 優先新鮮期 A/B 級；{channelDisplay('Phone')}／{channelDisplay('Wholesale')} 適合保鮮期組合；展示期建議促銷或加工。
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {insights.map((ins, idx) => (
@@ -278,13 +290,13 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
               <h4 className="text-sm font-semibold text-gray-700 mb-2">本週執行建議</h4>
               <div className="space-y-1 text-xs text-gray-600">
                 {freshQty > 0 && (
-                  <p>• <b>新鮮期優先</b>：將 {freshItems.slice(0,3).map(i=>i.productName).join('、')} 等新鮮品優先配給 Direct/Line 通路</p>
+                  <p>• <b>新鮮期優先</b>：將 {topNames(freshItems)} 等新鮮品優先配給 {channelDisplay('Direct')}／{channelDisplay('Line')} 通路</p>
                 )}
                 {preservationQty > 100 && (
-                  <p>• <b>保鮮期促銷</b>：{preservationItems.slice(0,3).map(i=>i.productName).join('、')} 進入保鮮期，適合 Phone/Wholesale 組合銷售</p>
+                  <p>• <b>保鮮期促銷</b>：{topNames(preservationItems)} 進入保鮮期，適合 {channelDisplay('Phone')}／{channelDisplay('Wholesale')} 組合銷售</p>
                 )}
                 {displayQty > 50 && (
-                  <p className="text-orange-600">• <b>臨期處理</b>：{displayItems.slice(0,3).map(i=>i.productName).join('、')} 已逾 14 天，建議促銷或轉加工通路</p>
+                  <p className="text-orange-600">• <b>臨期處理</b>：{topNames(displayItems)} 已逾 14 天，建議促銷或轉加工通路</p>
                 )}
                 {freshQty === 0 && preservationQty === 0 && displayQty === 0 && (
                   <p className="text-gray-500">• 無庫存或無採收日期記錄，請確保新入庫品項填寫 harvest_date</p>

@@ -128,9 +128,10 @@ GROUP BY product_name;
 
 -- Product grades
 INSERT INTO product_grades (product_name, grades) VALUES
-  ('蜜桃', ARRAY['A','B','C']),
   ('水蜜桃', ARRAY['A','B','C']),
-  ('黃金桃', ARRAY['A','B','C'])
+  ('蜜蘋果', ARRAY['A','B','C']),
+  ('柿子',   ARRAY['A','B']),
+  ('梨子',   ARRAY['A','B','C'])
 ON CONFLICT (product_name) DO UPDATE SET grades = EXCLUDED.grades;
 
 -- Storage locations
@@ -144,10 +145,10 @@ ON CONFLICT (name) DO NOTHING;
 -- Plots
 INSERT INTO plots (name, crop, area, status, health) VALUES
   ('北坡一號', '水蜜桃', 0.8, 'Active', 88),
-  ('南坡二號', '黃金桃', 0.6, 'Maintenance', 72),
-  ('河畔區',   '蜜桃',   1.2, 'Active', 90),
-  ('東側試驗田', '蜜桃', 0.4, 'Active', 75),
-  ('西側老園',   '黃金桃', 1.0, 'Maintenance', 65)
+  ('南坡二號', '柿子',   0.6, 'Maintenance', 72),
+  ('河畔區',   '梨子',   1.2, 'Active', 90),
+  ('東側試驗田', '蜜蘋果', 0.4, 'Active', 75),
+  ('西側老園',   '柿子',   1.0, 'Maintenance', 65)
 ON CONFLICT (name) DO NOTHING;
 
 -- Customers (20)
@@ -180,15 +181,17 @@ WITH loc AS (
 )
 -- Inventory (more rows across locations and grades)
 INSERT INTO inventory (product_name, grade, quantity, location_id, harvest_date, package_spec, batch_id, origin_plot_id)
-SELECT '蜜桃','A',120,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '5 days','2kg 禮盒','BATCH-PA-001',(SELECT id FROM plots WHERE name='河畔區') UNION ALL
-SELECT '蜜桃','B',200,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '8 days','散裝10kg','BATCH-PB-001',(SELECT id FROM plots WHERE name='西側老園') UNION ALL
-SELECT '蜜桃','C',150,(SELECT id FROM loc WHERE name='批發運輸'), CURRENT_DATE - INTERVAL '2 days','散裝20kg','BATCH-PC-002',(SELECT id FROM plots WHERE name='河畔區') UNION ALL
-SELECT '水蜜桃','A',80,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '4 days','2kg 禮盒','BATCH-SA-003',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
-SELECT '水蜜桃','B',140,(SELECT id FROM loc WHERE name='門市展示'), CURRENT_DATE - INTERVAL '3 days','1kg 小盒','BATCH-SB-004',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
-SELECT '水蜜桃','C',220,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '10 days','散裝10kg','BATCH-SC-005',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
-SELECT '黃金桃','A',90,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '6 days','2kg 禮盒','BATCH-YA-006',(SELECT id FROM plots WHERE name='南坡二號') UNION ALL
-SELECT '黃金桃','B',160,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '9 days','散裝10kg','BATCH-YB-007',(SELECT id FROM plots WHERE name='南坡二號') UNION ALL
-SELECT '黃金桃','C',240,(SELECT id FROM loc WHERE name='批發運輸'), CURRENT_DATE - INTERVAL '1 day','散裝20kg','BATCH-YC-008',(SELECT id FROM plots WHERE name='西側老園');
+SELECT '水蜜桃','A',120,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '5 days','2kg 禮盒','BATCH-SMA-001',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
+SELECT '水蜜桃','B',200,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '8 days','散裝10kg','BATCH-SMB-001',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
+SELECT '水蜜桃','C',150,(SELECT id FROM loc WHERE name='門市展示'), CURRENT_DATE - INTERVAL '2 days','1kg 小盒','BATCH-SMC-002',(SELECT id FROM plots WHERE name='北坡一號') UNION ALL
+SELECT '蜜蘋果','A',80,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '4 days','2kg 禮盒','BATCH-MA-003',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
+SELECT '蜜蘋果','B',140,(SELECT id FROM loc WHERE name='門市展示'), CURRENT_DATE - INTERVAL '3 days','1kg 小盒','BATCH-MB-004',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
+SELECT '蜜蘋果','C',220,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '10 days','散裝10kg','BATCH-MC-005',(SELECT id FROM plots WHERE name='東側試驗田') UNION ALL
+SELECT '柿子','A',90,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '6 days','2kg 禮盒','BATCH-KA-006',(SELECT id FROM plots WHERE name='南坡二號') UNION ALL
+SELECT '柿子','B',160,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '9 days','散裝10kg','BATCH-KB-007',(SELECT id FROM plots WHERE name='南坡二號') UNION ALL
+SELECT '梨子','A',110,(SELECT id FROM loc WHERE name='冷藏一號'), CURRENT_DATE - INTERVAL '7 days','2kg 禮盒','BATCH-PA-008',(SELECT id FROM plots WHERE name='河畔區') UNION ALL
+SELECT '梨子','B',180,(SELECT id FROM loc WHERE name='常溫倉'), CURRENT_DATE - INTERVAL '5 days','散裝10kg','BATCH-PB-009',(SELECT id FROM plots WHERE name='河畔區') UNION ALL
+SELECT '梨子','C',200,(SELECT id FROM loc WHERE name='批發運輸'), CURRENT_DATE - INTERVAL '1 day','散裝20kg','BATCH-PC-010',(SELECT id FROM plots WHERE name='河畔區');
 
 -- Orders + items (15 orders)
 -- Using CTEs to bind generated order IDs
@@ -197,7 +200,7 @@ WITH o AS (
   VALUES (gen_random_uuid(),'陳大同','Direct',2350,'Completed') RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
-SELECT id,'蜜桃','A',3,350 FROM o UNION ALL SELECT id,'黃金桃','B',5,220 FROM o;
+SELECT id,'蜜蘋果','A',3,350 FROM o UNION ALL SELECT id,'梨子','B',5,220 FROM o;
 UPDATE customers SET total_spent = total_spent + 2350, last_order_date = NOW() WHERE name='陳大同';
 
 WITH o AS (
@@ -213,7 +216,7 @@ WITH o AS (
   VALUES (gen_random_uuid(),'王阿強','Phone',2960,'Completed') RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
-SELECT id,'蜜桃','B',4,250 FROM o UNION ALL SELECT id,'黃金桃','A',4,320 FROM o;
+SELECT id,'蜜蘋果','B',4,250 FROM o UNION ALL SELECT id,'水蜜桃','A',4,320 FROM o;
 UPDATE customers SET total_spent = total_spent + 2960, last_order_date = NOW() WHERE name='王阿強';
 
 WITH o AS (
@@ -221,7 +224,7 @@ WITH o AS (
   VALUES (gen_random_uuid(),'張三','Wholesale',5400,'Completed') RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
-SELECT id,'蜜桃','C',10,150 FROM o UNION ALL SELECT id,'黃金桃','C',12,120 FROM o;
+SELECT id,'蜜蘋果','C',10,150 FROM o UNION ALL SELECT id,'梨子','C',12,120 FROM o;
 UPDATE customers SET total_spent = total_spent + 5400, last_order_date = NOW() WHERE name='張三';
 
 WITH o AS (
@@ -229,7 +232,7 @@ WITH o AS (
   VALUES (gen_random_uuid(),'李四','Direct',1450,'Completed') RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
-SELECT id,'水蜜桃','B',2,280 FROM o UNION ALL SELECT id,'蜜桃','A',1,350 FROM o UNION ALL SELECT id,'黃金桃','C',5,120 FROM o;
+SELECT id,'水蜜桃','B',2,280 FROM o UNION ALL SELECT id,'蜜蘋果','A',1,350 FROM o UNION ALL SELECT id,'梨子','C',5,120 FROM o;
 UPDATE customers SET total_spent = total_spent + 1450, last_order_date = NOW() WHERE name='李四';
 
 -- ... add 10 more orders similar to above for richer dataset
@@ -238,7 +241,7 @@ WITH o AS (
   VALUES (gen_random_uuid(),'羅十','Phone',1720,'Completed') RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
-SELECT id,'水蜜桃','B',3,280 FROM o UNION ALL SELECT id,'蜜桃','C',4,150 FROM o;
+SELECT id,'水蜜桃','B',3,280 FROM o UNION ALL SELECT id,'蜜蘋果','C',4,150 FROM o;
 UPDATE customers SET total_spent = total_spent + 1720, last_order_date = NOW() WHERE name='羅十';
 
 WITH o AS (
@@ -246,7 +249,7 @@ WITH o AS (
   VALUES (gen_random_uuid(),'鄭十一','Line',3220,'Completed') RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
-SELECT id,'黃金桃','A',6,320 FROM o UNION ALL SELECT id,'蜜桃','B',4,250 FROM o;
+SELECT id,'柿子','A',6,320 FROM o UNION ALL SELECT id,'蜜蘋果','B',4,250 FROM o;
 UPDATE customers SET total_spent = total_spent + 3220, last_order_date = NOW() WHERE name='鄭十一';
 
 WITH o AS (
@@ -254,7 +257,7 @@ WITH o AS (
   VALUES (gen_random_uuid(),'吳十六','Direct',1980,'Completed') RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
-SELECT id,'蜜桃','A',2,350 FROM o UNION ALL SELECT id,'黃金桃','B',4,220 FROM o;
+SELECT id,'蜜蘋果','A',2,350 FROM o UNION ALL SELECT id,'梨子','B',4,220 FROM o;
 UPDATE customers SET total_spent = total_spent + 1980, last_order_date = NOW() WHERE name='吳十六';
 
 WITH o AS (
@@ -262,22 +265,22 @@ WITH o AS (
   VALUES (gen_random_uuid(),'孫十七','Line',1520,'Completed') RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
-SELECT id,'水蜜桃','A',1,400 FROM o UNION ALL SELECT id,'水蜜桃','C',4,180 FROM o;
+SELECT id,'蜜蘋果','A',1,400 FROM o UNION ALL SELECT id,'水蜜桃','C',4,180 FROM o;
 UPDATE customers SET total_spent = total_spent + 1520, last_order_date = NOW() WHERE name='孫十七';
 
 -- Logs (20+ entries across activities)
 INSERT INTO logs (date, plot_id, activity, crop_type, notes, cost, worker) VALUES
  (NOW() - INTERVAL '21 days', (SELECT id FROM plots WHERE name='北坡一號'), 'Fertilize', '水蜜桃', '底肥施用，依土壤檢測配方', 3000, '阿德'),
- (NOW() - INTERVAL '18 days', (SELECT id FROM plots WHERE name='北坡一號'), 'Pesticide', '水蜜桃', '針對葉蟬進行低劑量施藥', 1800, '小芳'),
+ (NOW() - INTERVAL '18 days', (SELECT id FROM plots WHERE name='北坡一號'), 'Pesticide', '水蜜桃', '針對病蟲進行低劑量施藥', 1800, '小芳'),
  (NOW() - INTERVAL '14 days', (SELECT id FROM plots WHERE name='北坡一號'), 'Pruning', '水蜜桃', '修剪病枝並改善通風', 1200, '阿德'),
- (NOW() - INTERVAL '10 days', (SELECT id FROM plots WHERE name='南坡二號'), 'Weeding', '黃金桃', '人工除草沿行間', 800, '小張'),
- (NOW() - INTERVAL '7 days',  (SELECT id FROM plots WHERE name='南坡二號'), 'Bagging',  '黃金桃', '果實套袋保護', 1500, '小張'),
- (NOW() - INTERVAL '5 days',  (SELECT id FROM plots WHERE name='河畔區'),   'Pesticide', '蜜桃',   '夜間防治粉蚧', 1600, '阿德'),
- (NOW() - INTERVAL '3 days',  (SELECT id FROM plots WHERE name='河畔區'),   'Harvest',   '蜜桃',   '分批採收 300kg', 0,    '全員'),
- (NOW() - INTERVAL '2 days',  (SELECT id FROM plots WHERE name='北坡一號'), 'AIAdvice',  '水蜜桃', 'AI 建議：加強灌溉管理與葉面追肥', 0, 'AI'),
- (NOW() - INTERVAL '1 days',  (SELECT id FROM plots WHERE name='南坡二號'), 'Pruning',  '黃金桃', '修剪徒長枝，提升通風與光照', 900, '小張'),
- (NOW() - INTERVAL '12 days', (SELECT id FROM plots WHERE name='東側試驗田'), 'Weeding',  '蜜桃', '除草並鋪設覆蓋物', 700, '阿德'),
- (NOW() - INTERVAL '11 days', (SELECT id FROM plots WHERE name='東側試驗田'), 'Pesticide','蜜桃','低劑量生物性防治', 900, '小芳'),
- (NOW() - INTERVAL '9 days',  (SELECT id FROM plots WHERE name='西側老園'),   'Pruning',  '黃金桃','修剪更新樹勢', 1300, '全員');
+ (NOW() - INTERVAL '10 days', (SELECT id FROM plots WHERE name='南坡二號'), 'Weeding', '柿子', '人工除草沿行間', 800, '小張'),
+ (NOW() - INTERVAL '7 days',  (SELECT id FROM plots WHERE name='南坡二號'), 'Bagging',  '柿子', '果實套袋保護', 1500, '小張'),
+ (NOW() - INTERVAL '5 days',  (SELECT id FROM plots WHERE name='河畔區'),   'Pesticide', '梨子',   '夜間防治粉蚧', 1600, '阿德'),
+ (NOW() - INTERVAL '3 days',  (SELECT id FROM plots WHERE name='河畔區'),   'Harvest',   '梨子',   '分批採收 300kg', 0,    '全員'),
+ (NOW() - INTERVAL '2 days',  (SELECT id FROM plots WHERE name='東側試驗田'), 'AIAdvice',  '蜜蘋果', 'AI 建議：加強灌溉管理與葉面追肥', 0, 'AI'),
+ (NOW() - INTERVAL '1 days',  (SELECT id FROM plots WHERE name='南坡二號'), 'Pruning',  '柿子', '修剪徒長枝，提升通風與光照', 900, '小張'),
+ (NOW() - INTERVAL '12 days', (SELECT id FROM plots WHERE name='東側試驗田'), 'Weeding',  '蜜蘋果', '除草並鋪設覆蓋物', 700, '阿德'),
+ (NOW() - INTERVAL '11 days', (SELECT id FROM plots WHERE name='東側試驗田'), 'Pesticide','蜜蘋果','低劑量生物性防治', 900, '小芳'),
+ (NOW() - INTERVAL '9 days',  (SELECT id FROM plots WHERE name='西側老園'),   'Pruning',  '柿子','修剪更新樹勢', 1300, '全員');
 
 COMMIT;
