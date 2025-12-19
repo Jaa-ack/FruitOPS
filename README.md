@@ -25,29 +25,27 @@
 
 📱 **Vercel 部署版本**：[https://fruit-ops.vercel.app](https://fruit-ops.vercel.app)
 
-快速開始無需本地部署，登入後即可體驗完整功能。
-
 ---
 
 ## ✨ 核心功能
 
 ### 📊 決策與分析
-- 🧠 **今日決策建議** - 首頁頂部即時可操作建議（補貨、訂單優先、儲位調整、銷售推進）
-- 📅 **生產銷售行事曆** - 可視化水果季節週期（春/夏/秋/冬），按優先度分層推薦
-- 👥 **RFM 客戶分級** - Recency/Frequency/Monetary 自動分段（VIP/Stable/Regular/New/AtRisk）
-- 📈 **銷售通路分析** - 多通路數據彙總與績效對比
-- 🌡️ **作物健康評分** - 地塊健康度追蹤與預防性農業建議
+- 🧠 **決策建議分頁化**：Dashboard 保留圖表與季節提示；Inventory/Orders/Production 各自呈現時效、促銷、AI 建議
+- 📅 **生產銷售行事曆**：可視化水果季節週期（春/夏/秋/冬），按優先度分層推薦
+- 👥 **RFM 客戶分級**：Recency/Frequency/Monetary 自動分段（VIP/Stable/Regular/New/AtRisk）
+- 📈 **銷售通路分析**：多通路數據彙總與績效對比
+- 🌡️ **作物健康評分**：地塊健康度追蹤與預防性農業建議
 
 ### 🎯 業務流程
-- 🌳 **果園管理** - 地塊資訊、作物健康追蹤、農事日誌、季節性農務規劃
-- 📝 **農事日誌** - 快速記錄活動、成本、工時，支援按日期/地塊過濾
-- 📦 **分級庫存** - 多位置、多品級庫存管理，支援移位、彙總、賞味期追蹤
-- 🛒 **訂單管理** - 快速建單、揀貨、扣庫存、狀態流轉（Pending/Confirmed/Completed）
-- 📬 **客戶管理** - CRM 管理、RFM 分級、季節性客戶推薦、分段行銷
+- 🌳 **果園管理**：地塊資訊、作物健康追蹤、農事日誌、季節性農務規劃
+- 📦 **分級庫存**：多位置、多品級、入庫/移位/刪除，入庫支援 `harvest_date`、`package_spec`、`batch_id`、`origin_plot_id`；依採收日期自動生成時效分期與通路配置建議
+- 🛒 **訂單管理**：快速建單（含 `source`、`payment_status`、品項 `origin_plot_id`）、揀貨扣庫存、狀態流轉（Pending/Confirmed/Shipped/Completed）
+- 📬 **客戶管理**：CRM + RFM 分級，客戶卡與檔案可編輯姓名/電話/分級/`region`/`preferred_channel`
+- 📅 **生產銷售行事曆**：季節性供應與策略摘要
 
 ### 🤖 智能輔助
-- 🧠 **AI 顧問** - Google Gemini 實時回答（庫存分析、銷售建議、成本優化、簡訊撰寫）
-- 🔔 **全局通知** - Toast 系統通知所有表單操作（新增、更新、錯誤提示）
+- 🧠 **AI 顧問**：Google Gemini 實時回答（庫存分析、銷售建議、成本優化、簡訊撰寫）
+- 🔔 **全局通知**：Toast 系統通知所有表單操作（新增、更新、錯誤提示）
 
 ---
 
@@ -70,19 +68,19 @@
 
 ### 3) 分級庫存
 - 功能：多位置、多品級、入庫、移位、摘要與明細查詢
-- 「庫存決策細節建議」：
-   - 依據：低庫存 <50，高庫存 >200；平均=總量/品項數
-   - 顯示低/高存項與補貨建議，供倉儲與採購決策
+- 時效決策：依 `harvest_date` 分期（新鮮期 ≤7、保鮮期 8–14、展示期 >14 天），自動給出通路配置與促銷/加工建議
+- 表單欄位：`harvest_date`（必填）、`package_spec`、`batch_id`、`origin_plot_id`（選填）
 
 ### 4) 訂單管理
 - 快速新增訂單（多品項，依水果動態載入品級）
+- 新增欄位：`source`（通路來源）、`payment_status`，每個品項可填 `origin_plot_id`
 - 新訂單若使用新客戶姓名，系統會自動建立該客戶（CRM 可見）
 - 揀貨流程需為每項品項指定來源儲位且數量與需求一致，成功即扣庫存並更新狀態
 - 表格第一欄為「訂單日期」，顯示格式 `yyyy/MM/dd HH:mm`
 
 ### 5) CRM 客戶管理
 - 客戶卡片提供基本資訊與分群；點擊可打開客戶檔案彈窗
-- 檔案內可「編輯」姓名/電話/分級（保存後即寫入後端）
+- 檔案內可「編輯」姓名/電話/分級，並填寫 `region`、`preferred_channel`
 - 近期消費「日期顯示為 `yyyy/MM/dd HH:mm`」
 - 介面已移除 RFM 說明卡與「快速調整分級」；分級調整改於顧客設定中進行
 
@@ -171,37 +169,29 @@
 
 ```bash
 git clone https://github.com/Jaa-ack/FruitOPS.git
-cd FruitOPS
-npm install
-cd server && npm install && cd ..
-```
+## ✨ 核心功能
 
-#### 2. 設定 Supabase 資料庫
+### 📊 決策與分析
+- 🧠 **決策建議分頁化**：Dashboard 保留圖表與季節提示；Inventory/Orders/Production 各自呈現時效、促銷、AI 建議
+- 📅 **生產銷售行事曆**：可視化水果季節週期（春/夏/秋/冬），按優先度分層推薦
+- 👥 **RFM 客戶分級**：Recency/Frequency/Monetary 自動分段（VIP/Stable/Regular/New/AtRisk）
+- 📈 **銷售通路分析**：多通路數據彙總與績效對比
+- 🌡️ **作物健康評分**：地塊健康度追蹤與預防性農業建議
 
-a. **建立 Supabase 專案**
-   - 前往 [Supabase Dashboard](https://app.supabase.com)
-   - 建立新專案（選擇區域、設定密碼）
+### 🎯 業務流程
+- 🌳 **果園管理**：地塊資訊、作物健康追蹤、農事日誌、季節性農務規劃
+- 📦 **分級庫存**：多位置、多品級、入庫/移位/刪除，入庫支援 `harvest_date`、`package_spec`、`batch_id`、`origin_plot_id`；依採收日期自動生成時效分期與通路配置建議
+- 🛒 **訂單管理**：快速建單（含 `source`、`payment_status`、品項 `origin_plot_id`）、揀貨扣庫存、狀態流轉（Pending/Confirmed/Shipped/Completed）
+- 📬 **客戶管理**：CRM + RFM 分級，客戶卡與檔案可編輯姓名/電話/分級/`region`/`preferred_channel`
+- 📅 **生產銷售行事曆**：季節性供應與策略摘要
 
-b. **取得連線資訊**
-   - 進入 Project Settings → API
-   - 複製 `URL` 和 `service_role key`（請妥善保管此密鑰）
+### 🤖 智能輔助
+- 🧠 **AI 顧問**：Google Gemini 實時回答（庫存分析、銷售建議、成本優化、簡訊撰寫）
+- 🔔 **全局通知**：Toast 系統通知所有表單操作（新增、更新、錯誤提示）
 
-c. **執行資料庫遷移**
-   - 進入 SQL Editor
-   - 點選 "New Query"
-   - 複製 `server/migrations/002_rebuild_with_sample_data.sql`（含多位置庫存/訂單項目）完整內容
-   - 貼上並執行（點 Run）
-   - 看到 ✅ 成功訊息即完成
+---
 
-#### 3. 設定環境變數
-
-在 `server/` 目錄建立 `.env` 檔案：
-
-```env
-# Supabase 設定（必須）
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_KEY=your_service_role_key
-
+## 🛠 使用手冊（依頁面）
 # AI 服務（可選，未設定時 AI 功能不可用）
 GEMINI_API_KEY=your_gemini_api_key
 

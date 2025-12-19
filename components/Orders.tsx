@@ -16,12 +16,14 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
   const [newOrder, setNewOrder] = useState({
     customerName: '',
     channel: 'Direct',
+    source: 'Other',
+    paymentStatus: 'Unpaid',
     total: 0
   });
   const [newItems, setNewItems] = useState([
-    { productName: '', grade: 'A', qty: 1, price: 0 }
+    { productName: '', grade: 'A', qty: 1, price: 0, originPlotId: '' }
   ]);
-  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [productNames, setProductNames] = useState<string[]>([]);
   const [gradesByProduct, setGradesByProduct] = useState<Record<string, string[]>>({});
   const [inventoryDetail, setInventoryDetail] = useState<any[]>([]);
@@ -305,7 +307,8 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
         productName: i.productName,
         grade: i.grade || 'A',
         qty: Number(i.qty) || 1,
-        price: Number(i.price) || 0
+        price: Number(i.price) || 0,
+        originPlotId: i.originPlotId || ''
       }));
 
     if (normalizedItems.length === 0) {
@@ -318,6 +321,8 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
     const payload = {
       customerName: newOrder.customerName || '未命名客戶',
       channel: newOrder.channel,
+      source: newOrder.source,
+      payment_status: newOrder.paymentStatus,
       status: 'Pending',
       items: normalizedItems,
       total
@@ -331,8 +336,8 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        setNewOrder({ customerName: '', channel: 'Direct', total: 0 });
-        setNewItems([{ productName: '', grade: 'A', qty: 1, price: 0 }]);
+        setNewOrder({ customerName: '', channel: 'Direct', source: 'Other', paymentStatus: 'Unpaid', total: 0 });
+          setNewItems([{ productName: '', grade: 'A', qty: 1, price: 0, originPlotId: '' }]);
         onOrderChange?.();
         
         // Toast 通知
@@ -354,7 +359,7 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
   };
 
   const addItemRow = () => {
-    setNewItems(items => [...items, { productName: '', grade: 'A', qty: 1, price: 0 }]);
+    setNewItems(items => [...items, { productName: '', grade: 'A', qty: 1, price: 0, originPlotId: '' }]);
   };
 
   const removeItemRow = (idx: number) => {
@@ -378,11 +383,120 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
   return (
     <div className="space-y-6">
     {!safeOrders || safeOrders.length === 0 ? (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-        <ShoppingBag size={48} className="mb-4 opacity-50" />
-        <p className="text-lg font-medium">暫無訂單資料</p>
-        <p className="text-sm">訂單數據將在此顯示</p>
-      </div>
+      <>
+        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+          <ShoppingBag size={48} className="mb-4 opacity-50" />
+          <p className="text-lg font-medium">暫無訂單資料</p>
+          <p className="text-sm">訂單數據將在此顯示</p>
+        </div>
+
+        {/* 促銷優先品項與推薦客戶（依庫存時效 + RFM 分級理論） */}
+        {(() => {
+        const now = new Date();
+        const agingDays = (d?: string) => {
+          if (!d) return Infinity;
+          const dt = new Date(d);
+          if (isNaN(dt.getTime())) return Infinity;
+          return Math.floor((now.getTime() - dt.getTime()) / (1000 * 60 * 60 * 24));
+        };
+        // 展示期（>14 天）視為臨期，需要優先促銷
+        const displayItems = (inventoryDetail || [])
+          .filter((it: any) => agingDays(it.harvestDate || it.harvest_date) > 14)
+          .map((it: any) => ({
+            productName: it.productName || it.product_name,
+            grade: it.grade,
+            quantity: Number(it.quantity) || 0,
+            harvestDate: it.harvestDate || it.harvest_date,
+            location: it.location || it.location_id
+          }));
+
+        // 聚合到產品層級（品名+等級）
+        const aggMap: Record<string, { productName: string; grade: string; total: number; oldestDate?: string }> = {};
+        for (const it of displayItems) {
+          const key = `${it.productName}|${it.grade}`;
+          const prev = aggMap[key] || { productName: it.productName, grade: it.grade, total: 0, oldestDate: it.harvestDate };
+          const older = (!prev.oldestDate || agingDays(it.harvestDate) > agingDays(prev.oldestDate)) ? it.harvestDate : prev.oldestDate;
+          aggMap[key] = { productName: it.productName, grade: it.grade, total: prev.total + it.quantity, oldestDate: older };
+        }
+        const promoList = Object.values(aggMap).sort((a, b) => b.total - a.total).slice(0, 6);
+
+        // 推薦客戶（以 RFM 分級理論為基礎）
+        const bySegment: Record<string, any[]> = {};
+        (customers || []).forEach(c => {
+          const seg = (c.segment || 'Regular');
+          if (!bySegment[seg]) bySegment[seg] = [];
+          bySegment[seg].push(c);
+        });
+        const pickTop = (list: any[], n = 3) => (Array.isArray(list) ? list.slice(0, n) : []);
+        const theoryNotes = [
+          'RFM 理論：Recency/Frequency/Monetary 越佳，促銷轉換率越高。',
+          '臨期商品（>14天）建議走 Phone/Wholesale，搭配組合折扣提升出清速度。',
+          '對 Loyal/Regular 分群推特惠組合；對 At Risk 用喚回方案（限時折扣）。'
+        ];
+
+        if (promoList.length === 0) return null;
+        return (
+          <div className="bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">促銷優先品項與推薦客戶</h3>
+            <p className="text-xs text-gray-600 mb-3">
+              依據採收日期與時效（展示期 &gt;14 天）判定促銷優先品項，並以 RFM 分群理論推薦客戶與通路。
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {promoList.map((p, idx) => {
+                const loyal = pickTop(bySegment['VIP'] || bySegment['Stable'] || [], 2);
+                const regular = pickTop(bySegment['Regular'] || [], 3);
+                const atRisk = pickTop(bySegment['At Risk'] || [], 2);
+                const oldest = agingDays(p.oldestDate);
+                const channelAdvice = oldest > 21 ? 'Wholesale（大宗出清）' : 'Phone（電話組合促銷）';
+                return (
+                  <div key={idx} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-800">{p.productName}（{p.grade}）</div>
+                        <div className="text-xs text-gray-500">臨期量：{p.total}｜最早採收：{p.oldestDate || '-'}（{isFinite(oldest) ? `${oldest} 天前` : '未知'}）</div>
+                      </div>
+                      <span className="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">需優先促銷</span>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-600">
+                      建議通路：<b className="text-indigo-700">{channelAdvice}</b>；方案：<b>組合折扣 + 限時</b>
+                    </div>
+                    <div className="mt-3">
+                      <div className="text-xs text-gray-700 font-medium">推薦客戶</div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-1">
+                        <div>
+                          <div className="text-[11px] text-gray-500">VIP/Stable（高價值）</div>
+                          {loyal.length === 0 ? <div className="text-[11px] text-gray-400">無</div> : loyal.map((c, i) => (
+                            <div key={i} className="text-[12px]">• {c.name || c.customer_name}</div>
+                          ))}
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-500">Regular（穩定）</div>
+                          {regular.length === 0 ? <div className="text-[11px] text-gray-400">無</div> : regular.map((c, i) => (
+                            <div key={i} className="text-[12px]">• {c.name || c.customer_name}</div>
+                          ))}
+                        </div>
+                        <div>
+                          <div className="text-[11px] text-gray-500">At Risk（喚回）</div>
+                          {atRisk.length === 0 ? <div className="text-[11px] text-gray-400">無</div> : atRisk.map((c, i) => (
+                            <div key={i} className="text-[12px]">• {c.name || c.customer_name}</div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 bg-white border border-indigo-200 rounded-md p-3">
+              <div className="text-xs font-medium text-gray-700 mb-1">行銷建議理論依據</div>
+              <ul className="text-[12px] text-gray-600 list-disc pl-5 space-y-1">
+                {theoryNotes.map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+            </div>
+          </div>
+        );
+        })()}
+      </>
     ) : (
       <>
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -438,6 +552,34 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                 <option value="Wholesale">批發</option>
               </select>
             </div>
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">來源</label>
+              <select
+                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                value={newOrder.source}
+                onChange={(e) => setNewOrder({ ...newOrder, source: e.target.value })}
+              >
+                <option value="Other">其他</option>
+                <option value="GoogleForm">Google 表單</option>
+                <option value="LINE">LINE</option>
+                <option value="Phone">電話</option>
+                <option value="Fax">傳真</option>
+                <option value="WalkIn">現場</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">付款狀態</label>
+              <select
+                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                value={newOrder.paymentStatus}
+                onChange={(e) => setNewOrder({ ...newOrder, paymentStatus: e.target.value })}
+              >
+                <option value="Unpaid">未付款</option>
+                <option value="Paid">已付款</option>
+                <option value="Partial">部分付款</option>
+                <option value="Refunded">已退款</option>
+              </select>
+            </div>
             <div className="flex items-end">
               <div className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                 <p className="text-xs text-gray-500">總金額</p>
@@ -449,15 +591,16 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
           </div>
 
           <div className="space-y-2">
-              <div className="grid grid-cols-5 gap-2 text-xs text-gray-600 font-medium px-1">
+              <div className="grid grid-cols-6 gap-2 text-xs text-gray-600 font-medium px-1">
               <div>商品</div>
               <div>等級</div>
               <div>數量</div>
               <div>單價 (NT$)</div>
+              <div>來源地塊（選填）</div>
               <div className="text-center">操作</div>
             </div>
             {newItems.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center">
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
                 <select
                   className="border border-gray-300 rounded-md px-3 py-2"
                   value={item.productName || ''}
@@ -509,6 +652,13 @@ const Orders: React.FC<OrdersProps> = ({ orders, onOrderChange }) => {
                   value={item.price}
                   onChange={(e) => updateItem(idx, 'price', Number(e.target.value))}
                   required
+                />
+                <input
+                  type="text"
+                  className="border border-gray-300 rounded-md px-3 py-2"
+                  placeholder="例如 P-001"
+                  value={item.originPlotId}
+                  onChange={(e) => updateItem(idx, 'originPlotId', e.target.value)}
                 />
                 <div className="flex gap-1 justify-center">
                   {newItems.length === 1 ? (

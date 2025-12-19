@@ -16,7 +16,7 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
   const [segmentation, setSegmentation] = useState<any[]>([]);
   const [calculating, setCalculating] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState<{ name: string; phone: string; segment: string }>({ name: '', phone: '', segment: 'Regular' });
+  const [editForm, setEditForm] = useState<{ name: string; phone: string; segment: string; region: string; preferredChannel: string }>({ name: '', phone: '', segment: 'Regular', region: '', preferredChannel: '' });
   
   // 從 URL 參數獲取客戶名稱（來自訂單跳轉）
   const highlightedCustomer = useMemo(() => {
@@ -31,7 +31,9 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
         phone: c.phone || '未提供電話',
         segment: c.segment || 'Stable',
         totalSpent: Number(c.totalSpent) || 0,
-        lastOrderDate: c.lastOrderDate || '未紀錄'
+        lastOrderDate: c.lastOrderDate || '未紀錄',
+        region: c.region || '未提供地區',
+        preferredChannel: c.preferredChannel || ''
       }))
     : [];
 
@@ -286,8 +288,9 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                                 <User size={20} />
                             </div>
                             <div>
-                                <h4 className="font-bold text-gray-800">{customer.name}</h4>
-                                <p className="text-xs text-gray-400 font-mono">{customer.phone}</p>
+                              <h4 className="font-bold text-gray-800">{customer.name}</h4>
+                              <p className="text-xs text-gray-400 font-mono">{customer.phone}</p>
+                              <p className="text-xs text-gray-500">{customer.region}</p>
                             </div>
                         </div>
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${getSegmentStyle(customer.segment)}`}>
@@ -334,9 +337,10 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mb-1">{selectedCustomer.phone}</p>
+                <p className="text-xs text-gray-500 mb-2">{selectedCustomer.region || '未提供地區'}</p>
                 <button
                   className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md transition"
-                  onClick={() => { setEditing(true); setEditForm({ name: selectedCustomer.name, phone: selectedCustomer.phone || '', segment: selectedCustomer.segment || 'Regular' }); }}
+                  onClick={() => { setEditing(true); setEditForm({ name: selectedCustomer.name, phone: selectedCustomer.phone || '', segment: selectedCustomer.segment || 'Regular', region: selectedCustomer.region || '', preferredChannel: selectedCustomer.preferredChannel || '' }); }}
                   title="編輯顧客資訊"
                 >
                   <Pencil size={14} /> 編輯基本資訊
@@ -475,6 +479,20 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                     <input className="mt-1 w-full border border-gray-300 rounded px-3 py-2" value={editForm.phone} onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))} />
                   </label>
                   <label className="block">
+                    <span className="text-xs text-gray-700 font-medium">地區</span>
+                    <input className="mt-1 w-full border border-gray-300 rounded px-3 py-2" value={editForm.region} onChange={(e) => setEditForm(f => ({ ...f, region: e.target.value }))} placeholder="例：台北市、台中港批發市場" />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-gray-700 font-medium">偏好通路</span>
+                    <select className="mt-1 w-full border border-gray-300 rounded px-3 py-2" value={editForm.preferredChannel} onChange={(e) => setEditForm(f => ({ ...f, preferredChannel: e.target.value }))}>
+                      <option value="">未指定</option>
+                      <option value="Direct">直接銷售</option>
+                      <option value="Line">LINE</option>
+                      <option value="Phone">電話</option>
+                      <option value="Wholesale">批發</option>
+                    </select>
+                  </label>
+                  <label className="block">
                     <span className="text-xs text-gray-700 font-medium">客戶分級</span>
                     <select className="mt-1 w-full border border-gray-300 rounded px-3 py-2" value={editForm.segment} onChange={(e) => setEditForm(f => ({ ...f, segment: e.target.value }))}>
                       <option value="VIP">貴賓</option>
@@ -495,7 +513,7 @@ const CRM: React.FC<CRMProps> = ({ customers }) => {
                         const res = await fetch(`/api/customers/${selectedCustomer.id}`, {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ name: editForm.name, phone: editForm.phone, segment: editForm.segment })
+                          body: JSON.stringify({ name: editForm.name, phone: editForm.phone, segment: editForm.segment, region: editForm.region, preferredChannel: editForm.preferredChannel })
                         });
                         if (res.ok) {
                           setSelectedCustomer(prev => prev ? { ...prev, ...editForm } as Customer : prev);

@@ -10,6 +10,9 @@ interface InventoryDetail {
   location: string;
   locationId: string;
   harvestDate?: string;
+  packageSpec?: string;
+  batchId?: string;
+  originPlotId?: string;
 }
 
 interface InventorySummary {
@@ -35,7 +38,11 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
     productName: '',
     grade: 'A',
     quantity: 0,
-    locationId: ''
+    locationId: '',
+    harvestDate: '',
+    packageSpec: '',
+    batchId: '',
+    originPlotId: ''
   });
 
   // 獲取數據
@@ -64,7 +71,22 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
         })) : [];
         setSummarySummary(summary);
       }
-      if (detailRes.ok) setDetailData(await detailRes.json());
+      if (detailRes.ok) {
+        const detailRaw = await detailRes.json();
+        const detail = Array.isArray(detailRaw) ? detailRaw.map((row: any) => ({
+          id: row.id,
+          productName: row.productName ?? row.product_name,
+          grade: row.grade,
+          quantity: row.quantity ?? row.qty ?? 0,
+          location: row.location ?? row.location_name ?? '',
+          locationId: row.locationId ?? row.location_id ?? '',
+          harvestDate: row.harvestDate ?? row.harvest_date,
+          packageSpec: row.packageSpec ?? row.package_spec,
+          batchId: row.batchId ?? row.batch_id,
+          originPlotId: row.originPlotId ?? row.origin_plot_id
+        })) : [];
+        setDetailData(detail);
+      }
       if (locRes.ok) setStorageLocations(await locRes.json());
       if (gradesRes.ok) {
         const gradeData = await gradesRes.json();
@@ -109,13 +131,17 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
           productName: formData.productName,
           grade: formData.grade,
           quantity: Number(formData.quantity) || 0,
-          locationId: formData.locationId
+          locationId: formData.locationId,
+          harvestDate: formData.harvestDate || undefined,
+          packageSpec: formData.packageSpec || undefined,
+          batchId: formData.batchId || undefined,
+          originPlotId: formData.originPlotId || undefined
         })
       });
 
       if (response.ok) {
         setShowAddForm(false);
-        setFormData({ productName: '', grade: 'A', quantity: 0, locationId: '' });
+        setFormData({ productName: '', grade: 'A', quantity: 0, locationId: '', harvestDate: '', packageSpec: '', batchId: '', originPlotId: '' });
         await fetchData();
         onInventoryChange?.();
         
@@ -195,6 +221,80 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
         </button>
       </div>
 
+      {/* 庫存時效與通路配置建議（提升到頁面上方） */}
+      {(() => {
+        const totalInventory = (summarySummary || []).reduce((sum, s) => sum + (Number(s.totalQuantity) || 0), 0);
+        const avgStock = (summarySummary || []).length > 0 ? Math.round(totalInventory / summarySummary.length) : 0;
+        const now = new Date();
+        const freshItems = (detailData || []).filter(d => {
+          if (!d.harvestDate) return false;
+          const harvestDate = new Date(d.harvestDate);
+          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
+          return agingDays <= 7;
+        });
+        const preservationItems = (detailData || []).filter(d => {
+          if (!d.harvestDate) return false;
+          const harvestDate = new Date(d.harvestDate);
+          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
+          return agingDays > 7 && agingDays <= 14;
+        });
+        const displayItems = (detailData || []).filter(d => {
+          if (!d.harvestDate) return false;
+          const harvestDate = new Date(d.harvestDate);
+          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
+          return agingDays > 14;
+        });
+        const freshQty = freshItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+        const preservationQty = preservationItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+        const displayQty = displayItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+        const insights = [
+          { label: '新鮮期庫存（≤7天）', value: `${freshQty} 單位`, color: 'text-green-600', advice: freshQty > 0 ? '優先配給 Direct/Line 通路，主打 A/B 級品' : '無新鮮採收，依靠冷藏庫存' },
+          { label: '保鮮期庫存（8-14天）', value: `${preservationQty} 單位`, color: 'text-blue-600', advice: preservationQty > 0 ? '適合 Phone/Wholesale 通路，推薦組合銷售' : '無保鮮期庫存' },
+          { label: '展示期庫存（>14天）', value: `${displayQty} 單位`, color: displayQty > 100 ? 'text-orange-600' : 'text-gray-600', advice: displayQty > 100 ? '進入臨期，建議促銷或加工通路處理' : displayQty > 0 ? '少量臨期品，可用於樣品展示' : '無臨期品' },
+          { label: '平均庫存/品項', value: `${avgStock} 單位`, color: 'text-purple-600', advice: avgStock < 30 ? '品項庫存偏低，關注採收計畫' : '庫存分佈健康' }
+        ];
+        return (
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-xl shadow-sm border border-emerald-100">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+              <AlertTriangle size={20} className="text-emerald-600" />
+              庫存時效與通路配置建議
+            </h3>
+              <p className="text-xs text-gray-600 mb-4">
+                依據：採收日期（harvest_date）計算時效分期（新鮮期 ≤7天、保鮮期 8-14天、展示期 &gt;14天），結合通路特性建議配置。
+              <br/><b>通路建議</b>：Direct/Line 優先新鮮期 A/B 級；Phone/Wholesale 適合保鮮期組合；展示期建議促銷或加工。
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {insights.map((ins, idx) => (
+                <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="text-sm text-gray-600 font-medium">{ins.label}</p>
+                    <span className={`text-lg font-bold ${ins.color}`}>{ins.value}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 border-t border-gray-100 pt-2">💡 {ins.advice}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 bg-white p-4 rounded-lg border border-emerald-200">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">本週執行建議</h4>
+              <div className="space-y-1 text-xs text-gray-600">
+                {freshQty > 0 && (
+                  <p>• <b>新鮮期優先</b>：將 {freshItems.slice(0,3).map(i=>i.productName).join('、')} 等新鮮品優先配給 Direct/Line 通路</p>
+                )}
+                {preservationQty > 100 && (
+                  <p>• <b>保鮮期促銷</b>：{preservationItems.slice(0,3).map(i=>i.productName).join('、')} 進入保鮮期，適合 Phone/Wholesale 組合銷售</p>
+                )}
+                {displayQty > 50 && (
+                  <p className="text-orange-600">• <b>臨期處理</b>：{displayItems.slice(0,3).map(i=>i.productName).join('、')} 已逾 14 天，建議促銷或轉加工通路</p>
+                )}
+                {freshQty === 0 && preservationQty === 0 && displayQty === 0 && (
+                  <p className="text-gray-500">• 無庫存或無採收日期記錄，請確保新入庫品項填寫 harvest_date</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 新增表單 */}
       {showAddForm && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg space-y-3">
@@ -240,6 +340,36 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
                 <option key={loc.id} value={loc.id}>{loc.name}</option>
               ))}
             </select>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <input
+              type="date"
+              placeholder="採收日期"
+              value={formData.harvestDate}
+              onChange={(e) => setFormData({ ...formData, harvestDate: e.target.value })}
+              className="p-2 border rounded"
+            />
+            <input
+              type="text"
+              placeholder="包裝規格（選填）"
+              value={formData.packageSpec}
+              onChange={(e) => setFormData({ ...formData, packageSpec: e.target.value })}
+              className="p-2 border rounded"
+            />
+            <input
+              type="text"
+              placeholder="批次編號（選填）"
+              value={formData.batchId}
+              onChange={(e) => setFormData({ ...formData, batchId: e.target.value })}
+              className="p-2 border rounded"
+            />
+            <input
+              type="text"
+              placeholder="來源地塊（選填，例如 P-001）"
+              value={formData.originPlotId}
+              onChange={(e) => setFormData({ ...formData, originPlotId: e.target.value })}
+              className="p-2 border rounded"
+            />
           </div>
           <div className="flex gap-2">
             <button
@@ -320,10 +450,19 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
                                 <div className="space-y-1 text-sm">
                                   {items.map(item => (
                                     <div key={item.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                                      <span>
-                                        📦 {item.location}
-                                        {item.harvestDate && <span className="text-gray-500 text-xs"> ({item.harvestDate})</span>}
-                                      </span>
+                                      <div className="flex flex-col text-sm">
+                                        <span>
+                                          📦 {item.location}
+                                          {item.harvestDate && <span className="text-gray-500 text-xs"> ({item.harvestDate})</span>}
+                                        </span>
+                                        {(item.packageSpec || item.batchId || item.originPlotId) && (
+                                          <span className="text-xs text-gray-500">
+                                            {item.packageSpec ? `規格: ${item.packageSpec}` : ''}
+                                            {item.batchId ? ` · 批次: ${item.batchId}` : ''}
+                                            {item.originPlotId ? ` · 地塊: ${item.originPlotId}` : ''}
+                                          </span>
+                                        )}
+                                      </div>
                                       <span className="font-semibold text-gray-800">{item.quantity} 件</span>
                                       <div className="space-x-1">
                                         <button className="text-blue-600 hover:text-blue-800 text-sm" onClick={() => {
@@ -364,103 +503,6 @@ const Inventory: React.FC<{ inventory: any[]; onInventoryChange?: () => void }> 
         </div>
       </div>
 
-      {/* 庫存決策細節（自 Dashboard 移入，重新設計為時效與通路策略） */}
-      {(() => {
-        const totalInventory = (summarySummary || []).reduce((sum, s) => sum + (Number(s.totalQuantity) || 0), 0);
-        const avgStock = (summarySummary || []).length > 0 ? Math.round(totalInventory / summarySummary.length) : 0;
-        
-        // 計算時效分析（依據 harvest_date）
-        const now = new Date();
-        const freshItems = (detailData || []).filter(d => {
-          if (!d.harvestDate) return false;
-          const harvestDate = new Date(d.harvestDate);
-          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
-          return agingDays <= 7;
-        });
-        const preservationItems = (detailData || []).filter(d => {
-          if (!d.harvestDate) return false;
-          const harvestDate = new Date(d.harvestDate);
-          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
-          return agingDays > 7 && agingDays <= 14;
-        });
-        const displayItems = (detailData || []).filter(d => {
-          if (!d.harvestDate) return false;
-          const harvestDate = new Date(d.harvestDate);
-          const agingDays = Math.floor((now.getTime() - harvestDate.getTime()) / (1000 * 60 * 60 * 24));
-          return agingDays > 14;
-        });
-        
-        const freshQty = freshItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-        const preservationQty = preservationItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-        const displayQty = displayItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-        
-        const insights = [
-          { 
-            label: '新鮮期庫存（≤7天）', 
-            value: `${freshQty} 單位`, 
-            color: 'text-green-600',
-            advice: freshQty > 0 ? '優先配給 Direct/Line 通路，主打 A/B 級品' : '無新鮮採收，依靠冷藏庫存'
-          },
-          { 
-            label: '保鮮期庫存（8-14天）', 
-            value: `${preservationQty} 單位`, 
-            color: 'text-blue-600',
-            advice: preservationQty > 0 ? '適合 Phone/Wholesale 通路，推薦組合銷售' : '無保鮮期庫存'
-          },
-          { 
-            label: '展示期庫存（>14天）', 
-            value: `${displayQty} 單位`, 
-            color: displayQty > 100 ? 'text-orange-600' : 'text-gray-600',
-            advice: displayQty > 100 ? '進入臨期，建議促銷或加工通路處理' : displayQty > 0 ? '少量臨期品，可用於樣品展示' : '無臨期品'
-          },
-          { 
-            label: '平均庫存/品項', 
-            value: `${avgStock} 單位`, 
-            color: 'text-purple-600',
-            advice: avgStock < 30 ? '品項庫存偏低，關注採收計畫' : '庫存分佈健康'
-          }
-        ];
-        return (
-          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-xl shadow-sm border border-emerald-100">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <AlertTriangle size={20} className="text-emerald-600" />
-              庫存時效與通路配置建議
-            </h3>
-            <p className="text-xs text-gray-600 mb-4">
-              依據：採收日期（harvest_date）計算時效分期（新鮮期 ≤7天、保鮮期 8-14天、展示期 &gt;14天），結合通路特性建議配置。
-              <br/><b>通路建議</b>：Direct/Line 優先新鮮期 A/B 級；Phone/Wholesale 適合保鮮期組合；展示期建議促銷或加工。
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {insights.map((ins, idx) => (
-                <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-sm text-gray-600 font-medium">{ins.label}</p>
-                    <span className={`text-lg font-bold ${ins.color}`}>{ins.value}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2 border-t border-gray-100 pt-2">💡 {ins.advice}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 bg-white p-4 rounded-lg border border-emerald-200">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">本週執行建議</h4>
-              <div className="space-y-1 text-xs text-gray-600">
-                {freshQty > 0 && (
-                  <p>• <b>新鮮期優先</b>：將 {freshItems.slice(0,3).map(i=>i.productName).join('、')} 等新鮮品優先配給 Direct/Line 通路</p>
-                )}
-                {preservationQty > 100 && (
-                  <p>• <b>保鮮期促銷</b>：{preservationItems.slice(0,3).map(i=>i.productName).join('、')} 進入保鮮期，適合 Phone/Wholesale 組合銷售</p>
-                )}
-                {displayQty > 50 && (
-                  <p className="text-orange-600">• <b>臨期處理</b>：{displayItems.slice(0,3).map(i=>i.productName).join('、')} 已逾 14 天，建議促銷或轉加工通路</p>
-                )}
-                {freshQty === 0 && preservationQty === 0 && displayQty === 0 && (
-                  <p className="text-gray-500">• 無庫存或無採收日期記錄，請確保新入庫品項填寫 harvest_date</p>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* 空狀態 */}
       {summarySummary.length === 0 && (
