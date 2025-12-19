@@ -4,12 +4,11 @@
 
 BEGIN;
 
--- Seed plots (if empty)
-INSERT INTO plots (name, crop, area, status, health)
+INSERT INTO plots (id, name, crop, area, status, health)
 VALUES
-  ('北坡一號', '水蜜桃', '0.8', 'Active', 88),
-  ('南坡二號', '黃金桃', '0.6', 'Maintenance', 72),
-  ('河畔區', '蜜桃', '1.2', 'Active', 90)
+  ('PLOT-NORTH-1', '北坡一號', '水蜜桃', '0.8', 'Active', 88),
+  ('PLOT-SOUTH-2', '南坡二號', '黃金桃', '0.6', 'Maintenance', 72),
+  ('PLOT-RIVER',   '河畔區',   '蜜桃',   '1.2', 'Active', 90)
 ON CONFLICT DO NOTHING;
 
 -- Seed customers (12+)
@@ -36,8 +35,8 @@ ON CONFLICT DO NOTHING;
 -- Seed orders and items
 -- Order 1 - 陳大同
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('陳大同', 'Direct', 2350, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '陳大同', 'Direct', 2350, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -47,8 +46,8 @@ UPDATE customers SET total_spent = total_spent + 2350, last_order_date = NOW() W
 
 -- Order 2 - 林小美
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('林小美', 'Line', 1860, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '林小美', 'Line', 1860, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -58,8 +57,8 @@ UPDATE customers SET total_spent = total_spent + 1860, last_order_date = NOW() W
 
 -- Order 3 - 王阿強
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('王阿強', 'Phone', 2960, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '王阿強', 'Phone', 2960, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -69,8 +68,8 @@ UPDATE customers SET total_spent = total_spent + 2960, last_order_date = NOW() W
 
 -- Order 4 - 張三
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('張三', 'Wholesale', 5400, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '張三', 'Wholesale', 5400, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -80,8 +79,8 @@ UPDATE customers SET total_spent = total_spent + 5400, last_order_date = NOW() W
 
 -- Order 5 - 李四
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('李四', 'Direct', 1450, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '李四', 'Direct', 1450, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -92,8 +91,8 @@ UPDATE customers SET total_spent = total_spent + 1450, last_order_date = NOW() W
 
 -- Order 6 - 吳五
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('吳五', 'Line', 1680, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '吳五', 'Line', 1680, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -103,8 +102,8 @@ UPDATE customers SET total_spent = total_spent + 1680, last_order_date = NOW() W
 
 -- Order 7 - 周六
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('周六', 'Phone', 2140, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '周六', 'Phone', 2140, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -114,8 +113,8 @@ UPDATE customers SET total_spent = total_spent + 2140, last_order_date = NOW() W
 
 -- Order 8 - 許七
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('許七', 'Line', 1360, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '許七', 'Line', 1360, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -126,8 +125,8 @@ UPDATE customers SET total_spent = total_spent + 1360, last_order_date = NOW() W
 
 -- Order 9 - 黃八
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('黃八', 'Wholesale', 4800, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '黃八', 'Wholesale', 4800, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -137,8 +136,8 @@ UPDATE customers SET total_spent = total_spent + 4800, last_order_date = NOW() W
 
 -- Order 10 - 何九
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('何九', 'Direct', 950, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '何九', 'Direct', 950, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -148,8 +147,8 @@ UPDATE customers SET total_spent = total_spent + 950, last_order_date = NOW() WH
 
 -- Order 11 - 羅十
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('羅十', 'Phone', 1720, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '羅十', 'Phone', 1720, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -159,8 +158,8 @@ UPDATE customers SET total_spent = total_spent + 1720, last_order_date = NOW() W
 
 -- Order 12 - 鄭十一
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('鄭十一', 'Line', 3220, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '鄭十一', 'Line', 3220, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -170,8 +169,8 @@ UPDATE customers SET total_spent = total_spent + 3220, last_order_date = NOW() W
 
 -- (Optional) add more orders to exceed 10 customers with spending
 WITH o AS (
-  INSERT INTO orders (customer_name, channel, total, status)
-  VALUES ('張三', 'Wholesale', 3600, 'Completed')
+  INSERT INTO orders (id, customer_name, channel, total, status)
+  VALUES (gen_random_uuid(), '張三', 'Wholesale', 3600, 'Completed')
   RETURNING id
 )
 INSERT INTO order_items (order_id, product_name, grade, quantity, price)
@@ -181,16 +180,16 @@ UPDATE customers SET total_spent = total_spent + 3600, last_order_date = NOW() W
 
 -- Seed rich farm logs
 -- Activities: Fertilize, Pesticide, Pruning, Weeding, Bagging, Harvest, AIAdvice
-INSERT INTO logs (date, plot_id, activity, crop_type, notes, cost, worker)
+INSERT INTO logs (id, date, plot_id, activity, crop_type, notes, cost, worker)
 VALUES
-  (NOW() - INTERVAL '21 days', (SELECT id FROM plots WHERE name='北坡一號' LIMIT 1), 'Fertilize', '水蜜桃', '底肥施用，依土壤檢測配方', 3000, '阿德'),
-  (NOW() - INTERVAL '18 days', (SELECT id FROM plots WHERE name='北坡一號' LIMIT 1), 'Pesticide', '水蜜桃', '針對葉蟬進行低劑量施藥', 1800, '小芳'),
-  (NOW() - INTERVAL '14 days', (SELECT id FROM plots WHERE name='北坡一號' LIMIT 1), 'Pruning', '水蜜桃', '修剪病枝並改善通風', 1200, '阿德'),
-  (NOW() - INTERVAL '10 days', (SELECT id FROM plots WHERE name='南坡二號' LIMIT 1), 'Weeding', '黃金桃', '人工除草沿行間', 800, '小張'),
-  (NOW() - INTERVAL '7 days',  (SELECT id FROM plots WHERE name='南坡二號' LIMIT 1), 'Bagging',  '黃金桃', '果實套袋保護', 1500, '小張'),
-  (NOW() - INTERVAL '5 days',  (SELECT id FROM plots WHERE name='河畔區'   LIMIT 1), 'Pesticide', '蜜桃',   '夜間防治粉蚧', 1600, '阿德'),
-  (NOW() - INTERVAL '3 days',  (SELECT id FROM plots WHERE name='河畔區'   LIMIT 1), 'Harvest',   '蜜桃',   '分批採收 300kg', 0,    '全員'),
-  (NOW() - INTERVAL '2 days',  (SELECT id FROM plots WHERE name='北坡一號' LIMIT 1), 'AIAdvice',  '水蜜桃', 'AI 建議：加強灌溉管理與葉面追肥', 0, 'AI'),
-  (NOW() - INTERVAL '1 days',  (SELECT id FROM plots WHERE name='南坡二號' LIMIT 1), 'Pruning',  '黃金桃', '修剪徒長枝，提升通風與光照', 900, '小張');
+  (gen_random_uuid(), NOW() - INTERVAL '21 days', (SELECT id FROM plots WHERE name='北坡一號' LIMIT 1), 'Fertilize', '水蜜桃', '底肥施用，依土壤檢測配方', 3000, '阿德'),
+  (gen_random_uuid(), NOW() - INTERVAL '18 days', (SELECT id FROM plots WHERE name='北坡一號' LIMIT 1), 'Pesticide', '水蜜桃', '針對葉蟬進行低劑量施藥', 1800, '小芳'),
+  (gen_random_uuid(), NOW() - INTERVAL '14 days', (SELECT id FROM plots WHERE name='北坡一號' LIMIT 1), 'Pruning', '水蜜桃', '修剪病枝並改善通風', 1200, '阿德'),
+  (gen_random_uuid(), NOW() - INTERVAL '10 days', (SELECT id FROM plots WHERE name='南坡二號' LIMIT 1), 'Weeding', '黃金桃', '人工除草沿行間', 800, '小張'),
+  (gen_random_uuid(), NOW() - INTERVAL '7 days',  (SELECT id FROM plots WHERE name='南坡二號' LIMIT 1), 'Bagging',  '黃金桃', '果實套袋保護', 1500, '小張'),
+  (gen_random_uuid(), NOW() - INTERVAL '5 days',  (SELECT id FROM plots WHERE name='河畔區'   LIMIT 1), 'Pesticide', '蜜桃',   '夜間防治粉蚧', 1600, '阿德'),
+  (gen_random_uuid(), NOW() - INTERVAL '3 days',  (SELECT id FROM plots WHERE name='河畔區'   LIMIT 1), 'Harvest',   '蜜桃',   '分批採收 300kg', 0,    '全員'),
+  (gen_random_uuid(), NOW() - INTERVAL '2 days',  (SELECT id FROM plots WHERE name='北坡一號' LIMIT 1), 'AIAdvice',  '水蜜桃', 'AI 建議：加強灌溉管理與葉面追肥', 0, 'AI'),
+  (gen_random_uuid(), NOW() - INTERVAL '1 days',  (SELECT id FROM plots WHERE name='南坡二號' LIMIT 1), 'Pruning',  '黃金桃', '修剪徒長枝，提升通風與光照', 900, '小張');
 
 COMMIT;
