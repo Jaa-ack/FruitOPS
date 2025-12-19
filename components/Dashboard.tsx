@@ -42,7 +42,7 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory, customers = []
 
   const monthlyOrders = orders.filter(o => {
     const d = parseDate(o.date as any);
-    return d && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
+    return d && d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear && o.status === 'Completed';
   });
 
   const monthlySalesByProduct: Record<string, number> = {};
@@ -185,8 +185,8 @@ const Dashboard: React.FC<DashboardProps> = ({ orders, inventory, customers = []
           </div>
           <div>
             <p className="text-xs text-gray-500">本月產出 / 銷售量</p>
-            <p className="text-lg font-semibold text-gray-800">{monthlyHarvestTotal} / {monthlySoldTotal}</p>
-            <p className="text-xs text-gray-400">按品項聚合</p>
+            <p className="text-lg font-semibold text-gray-800">{monthlyHarvestTotal} / {monthlyOrders.length}</p>
+            <p className="text-xs text-gray-400">產量(件) / 完成訂單數</p>
           </div>
         </div>
 

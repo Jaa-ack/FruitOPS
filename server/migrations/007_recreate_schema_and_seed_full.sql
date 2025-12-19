@@ -268,6 +268,50 @@ INSERT INTO order_items (order_id, product_name, grade, quantity, price)
 SELECT id,'蜜蘋果','A',1,400 FROM o UNION ALL SELECT id,'水蜜桃','C',4,180 FROM o;
 UPDATE customers SET total_spent = total_spent + 1520, last_order_date = NOW() WHERE name='孫十七';
 
+-- 新增三位高消費客戶的訂單 (總消費額 >= 10000)
+-- 客戶1: 王阿強 (額外訂單讓其總消費超過10000)
+WITH o AS (
+  INSERT INTO orders (id, customer_name, channel, total, status, created_at)
+  VALUES (gen_random_uuid(),'王阿強','Phone',3850,'Completed', NOW() - INTERVAL '30 days') RETURNING id
+)
+INSERT INTO order_items (order_id, product_name, grade, quantity, price)
+SELECT id,'水蜜桃','A',8,400 FROM o UNION ALL SELECT id,'蜜蘋果','A',2,350 FROM o;
+UPDATE customers SET total_spent = total_spent + 3850, last_order_date = NOW() - INTERVAL '30 days' WHERE name='王阿強';
+
+WITH o AS (
+  INSERT INTO orders (id, customer_name, channel, total, status, created_at)
+  VALUES (gen_random_uuid(),'王阿強','Phone',4200,'Completed', NOW() - INTERVAL '45 days') RETURNING id
+)
+INSERT INTO order_items (order_id, product_name, grade, quantity, price)
+SELECT id,'柿子','A',10,320 FROM o UNION ALL SELECT id,'梨子','A',4,250 FROM o;
+UPDATE customers SET total_spent = total_spent + 4200, last_order_date = NOW() - INTERVAL '30 days' WHERE name='王阿強';
+
+-- 客戶2: 張三 (額外訂單讓其總消費超過10000)
+WITH o AS (
+  INSERT INTO orders (id, customer_name, channel, total, status, created_at)
+  VALUES (gen_random_uuid(),'張三','Wholesale',6800,'Completed', NOW() - INTERVAL '35 days') RETURNING id
+)
+INSERT INTO order_items (order_id, product_name, grade, quantity, price)
+SELECT id,'水蜜桃','C',30,180 FROM o UNION ALL SELECT id,'蜜蘋果','C',8,150 FROM o;
+UPDATE customers SET total_spent = total_spent + 6800, last_order_date = NOW() - INTERVAL '35 days' WHERE name='張三';
+
+-- 客戶3: 鄭十一 (額外訂單讓其總消費超過10000)
+WITH o AS (
+  INSERT INTO orders (id, customer_name, channel, total, status, created_at)
+  VALUES (gen_random_uuid(),'鄭十一','Line',4280,'Completed', NOW() - INTERVAL '40 days') RETURNING id
+)
+INSERT INTO order_items (order_id, product_name, grade, quantity, price)
+SELECT id,'蜜蘋果','A',8,350 FROM o UNION ALL SELECT id,'梨子','A',6,230 FROM o;
+UPDATE customers SET total_spent = total_spent + 4280, last_order_date = NOW() - INTERVAL '40 days' WHERE name='鄭十一';
+
+WITH o AS (
+  INSERT INTO orders (id, customer_name, channel, total, status, created_at)
+  VALUES (gen_random_uuid(),'鄭十一','Line',3720,'Completed', NOW() - INTERVAL '50 days') RETURNING id
+)
+INSERT INTO order_items (order_id, product_name, grade, quantity, price)
+SELECT id,'水蜜桃','A',6,400 FROM o UNION ALL SELECT id,'柿子','A',5,320 FROM o;
+UPDATE customers SET total_spent = total_spent + 3720, last_order_date = NOW() - INTERVAL '40 days' WHERE name='鄭十一';
+
 -- Logs (20+ entries across activities)
 INSERT INTO logs (date, plot_id, activity, crop_type, notes, cost, worker) VALUES
  (NOW() - INTERVAL '21 days', (SELECT id FROM plots WHERE name='北坡一號'), 'Fertilize', '水蜜桃', '底肥施用，依土壤檢測配方', 3000, '阿德'),
