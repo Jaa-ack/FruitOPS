@@ -65,7 +65,77 @@
 
 ---
 
-### 1.2 地塊健康度計算
+### 1.2 Dashboard 銷售指標計算
+
+**目的**：提供準確的營收數據，排除未確認與已取消訂單的干擾。
+
+**計算邏輯**：
+
+1. **本月銷售額（Monthly Revenue）**：
+   - **公式**：只計算已完成訂單的金額總額
+   ```typescript
+   const monthlyOrders = orders.filter(o => {
+     const d = parseDate(o.date);
+     return d && 
+            d.getMonth() + 1 === currentMonth && 
+            d.getFullYear() === currentYear && 
+            o.status === 'Completed';  // 關鍵：只計算已完成
+   });
+   
+   const monthlyRevenue = monthlyOrders.reduce(
+     (acc, curr) => acc + Number(curr.total), 0
+   );
+   ```
+   - **排除狀態**：
+     - `Pending`：尚未確認，不應計入收入
+     - `Cancelled`：已取消，不產生收入
+   - **業務意義**：實際入帳金額，財務報表基礎
+
+2. **本月銷售量（Monthly Sales Volume）**：
+   - **公式**：已完成訂單的數量（而非產品件數）
+   ```typescript
+   const monthlySalesCount = monthlyOrders.length;
+   ```
+   - **顯示格式**：「產量(件) / 完成訂單數」
+   - **範例**：`1650 / 15`（表示產出 1650 件水果，完成 15 筆訂單）
+   - **業務意義**：
+     - 服務效率指標，反映訂單處理能力
+     - 產銷比分析：產量 vs 訂單數，評估銷售效率與庫存周轉
+
+3. **VIP 客戶識別**：
+   - **公式**：從資料庫 `customers.segment` 欄位篩選
+   ```typescript
+   const vipCount = customers.filter(c => c.segment === 'VIP').length;
+   
+   const vipHighlights = customers
+     .filter(c => c.segment === 'VIP')
+     .map(c => ({
+       ...c,
+       daysSince: 計算距離最近訂單天數
+     }))
+     .sort((a, b) => 按最近訂單或總消費排序)
+     .slice(0, 5);  // 取前 5 位
+   ```
+   - **顯示內容**：
+     - VIP 客戶總數
+     - 前 5 位 VIP 動態：姓名、總消費、最近訂單天數
+   - **業務意義**：快速識別高價值客戶，優先關注與服務
+
+4. **高消費客戶範例**（系統預設）：
+   - **王阿強**：總消費 $11,010（VIP、電話通路）
+   - **張三**：總消費 $12,200（Regular、批發通路）
+   - **鄭十一**：總消費 $11,220（VIP、LINE 通路）
+   - **應用**：在 CRM 頁面計算 RFM 時，這些客戶很可能被識別為 VIP
+
+**API 端點**：
+- Dashboard 數據自動從 `/api/orders` 和 `/api/customers` 聚合計算
+- 前端組件：`components/Dashboard.tsx`
+
+**執行時機**：每次頁面載入時自動計算。
+
+---
+
+### 1.3 地塊健康度計算
 
 **目的**：量化地塊生產狀況，提供預防性維護與農務決策依據。
 
@@ -281,16 +351,23 @@
 
 **功能**：
 - 即時營收、待處理訂單、低庫存品項統計
+- **本月銷售額**：僅計算已完成訂單（排除 Pending/Cancelled）
+- **本月銷售量**：顯示已完成訂單數量（非產品件數）
+- **VIP 客戶動態**：自動從資料庫 segment 欄位識別，顯示前 5 位
 - 當月季節狀況提示（可銷售水果清單）
 - 銷售通路分佈圓餅圖
 - 當前庫存水位橫條圖
 - 生產銷售行事曆快速查看
 
 **說明**：
-- 已移除「今日決策建議」卡片；總覽專注於季節提示與關鍵圖表。決策建議分別在各頁提供：
+- 已移除「今日決策廊議」卡片；總覽專注於季節提示與關鍵圖表。決策建議分別在各頁提供：
    - Inventory：庫存時效與通路配置建議
    - Orders：促銷優先品項與推薦客戶
    - Production：AI 即時諮詢與建議留存
+- **關鍵指標計算**：
+  - 銷售額 = Σ(已完成訂單.total)
+  - 銷售量 = 已完成訂單.length
+  - VIP 數 = customers.filter(c => c.segment === 'VIP').length
 
 ---
 
