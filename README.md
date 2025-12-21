@@ -2,8 +2,6 @@
 
 完整的果園營運管理系統，整合季節性決策、RFM 客戶分級、實時庫存管理、訂單流程自動化，搭配 AI 顧問提供智能決策建議。
 
-[![部署到 Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Jaa-ack/FruitOPS)
-
 ---
 
 ## 🌐 線上試用
@@ -359,26 +357,7 @@ npm install
 cd server && npm install && cd ..
 ```
 
-#### 2. 設定 Supabase 資料庫
-
-**取得 Supabase 連線資訊**：
-1. 前往 [Supabase Dashboard](https://app.supabase.com)
-2. 選擇或建立專案
-3. 前往 Settings → API
-4. 複製以下資訊：
-   - `Project URL`（SUPABASE_URL）
-   - `service_role key`（SUPABASE_SERVICE_KEY）⚠️ 注意：使用 service_role 而非 anon key
-
-**執行資料庫遷移**：
-1. 前往 Supabase SQL Editor
-2. 執行 `CREATE EXTENSION IF NOT EXISTS pgcrypto;`
-3. 複製並執行 `server/migrations/007_recreate_schema_and_seed_full.sql` 全部內容
-4. 驗證資料表已建立：
-   ```sql
-   SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';
-   ```
-
-#### 3. 設定環境變數
+#### 2. 設定環境變數
 
 在專案**根目錄**建立 `.env` 檔案：
 
@@ -405,7 +384,7 @@ EOF
 2. 點擊「Create API Key」
 3. 複製 API Key 並填入 `.env`
 
-#### 4. 啟動應用
+#### 3. 啟動應用
 
 ```bash
 # 同時啟動前後端（推薦）
@@ -416,7 +395,7 @@ npm run dev         # 前端 (port 3000)
 npm run dev:server  # 後端 (port 4000)
 ```
 
-#### 5. 開啟瀏覽器
+#### 4. 開啟瀏覽器
 
 前往 http://localhost:3000 開始使用！
 
@@ -462,63 +441,6 @@ npm run preview          # 預覽建置結果
 
 ---
 
-## 🚀 部署到 Vercel
-
-### 環境變數設定
-
-在 Vercel Dashboard → Project Settings → Environment Variables 設定以下變數：
-
-**必須設定：**
-- `SUPABASE_URL` - Supabase 專案 URL
-- `SUPABASE_SERVICE_KEY` - Supabase Service Role Key
-- `DISABLE_LOCAL_DB` - 設為 `1`（生產環境禁用本地 fallback）
-
-**可選設定：**
-- `GEMINI_API_KEY` - Google Gemini API Key（AI 功能）
-- `API_TIMEOUT_MS` - API 請求逾時（預設 40000）
-- `AI_TIMEOUT_MS` - AI 請求逾時（預設 30000）
-
-### 部署步驟
-
-1. **Fork 專案** → Fork 此專案到你的 GitHub 帳號
-2. **連接 Vercel** → [Vercel Dashboard](https://vercel.com) → Import Project
-3. **設定環境變數** → 依照上述列表新增所有環境變數
-4. **部署** → 點擊 Deploy（建置時間約 1-2 分鐘）
-5. **驗證** → 前往 `https://your-project.vercel.app/api/healthz` 確認 API 正常
-
----
-
-## 🔐 安全提醒
-
-⚠️ **重要：環境變數安全**
-
-1. **切勿將 `.env` 檔案提交到 Git**
-   - `.env` 已列在 `.gitignore` 中
-   - 如已提交，請立即執行：
-     ```bash
-     git rm --cached .env
-     git commit -m "Remove .env from git tracking"
-     git push
-     ```
-   - 前往 Supabase 重新產生 service_role key
-
-2. **Vercel 環境變數管理**
-   - 所有機敏資料應設定在 Vercel Dashboard
-   - 不要在程式碼中硬編碼 API Key
-   - 使用 `process.env.VARIABLE_NAME` 讀取
-
-3. **API Key 保護**
-   - Gemini API Key 應定期輪替
-   - 監控 API 使用量避免濫用
-   - 設定 API 配額限制
-
-4. **資料庫安全**
-   - 使用 service_role key 而非 anon key
-   - 啟用 Row Level Security（RLS）
-   - 定期備份資料庫
-
----
-
 ## 📚 使用手冊
 
 ### 1) 生產銷售行事曆
@@ -548,16 +470,6 @@ npm run preview          # 預覽建置結果
 
 ---
 
-## 🤝 貢獻指南
-
-### 開發流程
-1. Fork 此專案
-2. 建立功能分支 (`git checkout -b feature/AmazingFeature`)
-3. Commit 你的變更 (`git commit -m 'Add some AmazingFeature'`)
-4. Push 到分支 (`git push origin feature/AmazingFeature`)
-5. 開啟 Pull Request
-
----
 
 ## 📄 授權
 
@@ -591,59 +503,6 @@ MIT License - 詳見 [LICENSE](LICENSE) 檔案
    - 11 筆庫存記錄
    - 12 筆農務日誌
 
-### 執行方式
-
-#### 方法一：Supabase Dashboard（推薦）
-
-1. 登入 **Supabase Dashboard**
-2. 進入 **SQL Editor**
-3. 複製貼上 `schema.sql` 的完整內容
-4. 點擊 **RUN** 執行
-5. 等待執行完成（應顯示 "Success"）
-6. 再次複製貼上 `seed_data.sql` 的完整內容
-7. 點擊 **RUN** 執行
-
-#### 方法二：psql 命令列
-
-```bash
-# 連線到資料庫
-psql "postgresql://postgres:[YOUR-PASSWORD]@[YOUR-HOST]:5432/postgres"
-
-# 執行 SQL 檔案
-\i server/migrations/schema.sql
-\i server/migrations/seed_data.sql
-```
-
-#### 方法三：完整重建（開發環境）
-
-```sql
--- 1. 先執行結構定義
-\i server/migrations/schema.sql
-
--- 2. 再執行資料填充
-\i server/migrations/seed_data.sql
-```
-
-### ⚠️ 重要注意事項
-
-**資料清除警告：**
-`schema.sql` 包含 `DROP TABLE` 指令，會**完全刪除現有資料**！
-
-**生產環境請務必：**
-1. 先備份現有資料
-2. 或註解掉 DROP TABLE 指令
-3. 改用 `ALTER TABLE` 方式增量更新
-
-**開發環境使用：**
-- ✅ 可以安全執行（重建整個資料庫）
-- ✅ 適合初始化開發環境
-- ✅ 適合重置測試資料
-
-**生產環境使用：**
-- ❌ **不要直接執行** `schema.sql`（會刪除資料）
-- ✅ 僅在初次建立資料庫時使用
-- ✅ 後續更新請使用增量遷移腳本
-
 ### 資料表結構概覽
 
 ```
@@ -657,34 +516,6 @@ inventory            庫存記錄
 logs                 農務日誌
 
 v_inventory_summary  庫存摘要視圖
-```
-
-### 驗證資料
-
-執行後可用以下查詢驗證：
-
-```sql
--- 檢查所有資料表
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema='public' 
-ORDER BY table_name;
-
--- 檢查資料筆數
-SELECT 
-  'customers' AS table_name, COUNT(*) AS count FROM customers UNION ALL
-SELECT 'orders', COUNT(*) FROM orders UNION ALL
-SELECT 'inventory', COUNT(*) FROM inventory UNION ALL
-SELECT 'logs', COUNT(*) FROM logs;
-
--- 檢查 VIP 客戶
-SELECT name, segment, total_spent 
-FROM customers 
-WHERE total_spent >= 10000 
-ORDER BY total_spent DESC;
-
--- 檢查庫存摘要
-SELECT * FROM v_inventory_summary;
 ```
 
 ### RFM 分級鎖定功能
@@ -805,142 +636,6 @@ Gemini API 生成回答
     ↓
 (Production 頁面) 儲存為 AIAdvice 日誌記錄
 ```
-
----
-
-## 📖 常見問題與最佳實踐
-
-### Q1: 為什麼要使用 Supabase 而非本地資料庫？
-**A:** Supabase 提供：
-- 自動擴展的 PostgreSQL 資料庫
-- 內建 REST API（無需手寫 CRUD）
-- 即時資料同步（未來可擴展）
-- 免費層級足夠開發使用
-- 生產級備份與安全性
-
-### Q2: AI 功能是否必須？
-**A:** 不是必須的。系統核心功能（庫存、訂單、CRM）不依賴 AI。
-- 未設定 `GEMINI_API_KEY` 時，AI 顧問按鈕會隱藏
-- 建議至少設定一個測試用 API Key 體驗智能建議功能
-
-### Q3: 如何處理大量資料？
-**A:** 系統設計考量：
-- 前端分頁載入（避免一次載入所有訂單）
-- 資料庫索引優化（RFM 查詢、庫存查詢）
-- API 超時保護（40 秒限制）
-- 建議定期歸檔舊訂單（>1年）
-
-### Q4: RFM 分級多久執行一次？
-**A:** 建議：
-- **每週一次**：中小型果園（<100 位客戶）
-- **每月一次**：大型果園（>100 位客戶）
-- **手動觸發**：促銷活動前、年度回顧前
-
-### Q5: 庫存時效如何計算？
-**A:** 系統依據 `harvest_date` 自動計算：
-```
-agingDays = (今天 - harvest_date) / (24 * 60 * 60 * 1000)
-```
-- ⚠️ 請務必在入庫時填寫正確的 `harvest_date`
-- 建議每日檢查「展示期」庫存（>14 天）
-
-### Q6: 訂單狀態流轉規則？
-**A:** 標準流程：
-```
-新訂單 → Pending (待確認)
-       ↓
-確認訂單 → Processing (處理中)
-       ↓
-揀貨完成 → Confirmed (已確認)
-       ↓
-出貨 → Shipped (已出貨)
-       ↓
-客戶收貨 → Completed (已完成)
-```
-- 只有 `Completed` 訂單計入銷售額
-- `Cancelled` 訂單不影響庫存
-
-### Q7: 如何備份資料？
-**A:** Supabase 提供：
-- 自動每日備份（保留 7 天）
-- 手動匯出：Dashboard → Database → Backups
-- SQL 匯出：`pg_dump` 指令
-
-**建議：**
-- 每月手動匯出一次完整備份
-- 重要操作前（如大量刪除）先備份
-
-### Q8: 超時設定為何這麼長？
-**A:** 系統超時設定：
-- **API 超時：40 秒**（應對複雜查詢、大量資料）
-- **AI 超時：30 秒**（Gemini API 回應時間較長）
-
-**為何需要：**
-- RFM 計算需處理所有客戶訂單（可能數百筆）
-- AI 生成詳細建議需要時間
-- 避免因網路延遲導致請求失敗
-
-**優化建議：**
-- 定期清理過期資料
-- 使用資料庫索引
-- 分批處理大量操作
-
----
-
-## 💡 最佳實踐建議
-
-### 日常維護
-
-**每日：**
-- 檢查庫存時效（重點：展示期 >14 天）
-- 處理新訂單（確認 → 揀貨 → 出貨）
-- 記錄農務日誌（施肥、修剪、採收等）
-
-**每週：**
-- 執行 RFM 分級計算（建議週一）
-- 查看地塊健康度評分
-- 規劃下週生產與銷售計畫
-
-**每月：**
-- 月初：RFM 分級更新與客戶分析
-- 月中：下月生產與銷售計畫
-- 月底：本月數據分析與總結
-
-### 資料維護
-
-1. **訂單資料完整性：**
-   - 確保填寫客戶名稱、通路、日期、金額
-   - 訂單狀態及時更新（避免長期 Pending）
-   - 已完成訂單不要輕易刪除（影響 RFM 計算）
-
-2. **庫存入庫規範：**
-   - **必填**：`harvest_date`（時效計算基礎）
-   - **選填**：`origin_plot_id`（追溯來源地塊）
-   - 建議：入庫時標註等級（A/B/C）
-
-3. **農務日誌記錄：**
-   - 詳細記錄作業類型、成本、備註
-   - AI 建議會自動記錄為 `AIAdvice` 類型
-   - 定期檢查日誌確保農務追蹤完整
-
-4. **客戶資料維護：**
-   - 確保聯絡電話正確（用於簡訊通知）
-   - 偏好通路設定準確（影響推薦邏輯）
-   - VIP 客戶可手動鎖定分級（避免誤降級）
-
-### 善用 AI 輔助
-
-**適合問 AI 的問題：**
-- ✅ 「目前庫存中哪些品項需要優先促銷？」
-- ✅ 「如何撰寫給 VIP 客戶的節日問候簡訊？」
-- ✅ 「本月銷售趨勢分析與下月建議」
-- ✅ 「地塊健康度低於 60 的處理建議」
-- ✅ 「成本優化建議（施肥、噴藥、人力）」
-
-**不適合問 AI 的問題：**
-- ❌ 系統操作問題（請參考本文檔）
-- ❌ 資料庫連線問題（請檢查環境變數）
-- ❌ 需要即時數據的精確計算（系統已自動計算）
 
 ---
 
