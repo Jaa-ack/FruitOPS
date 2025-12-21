@@ -470,21 +470,6 @@ npm run preview          # 預覽建置結果
 
 ---
 
-
-## 📄 授權
-
-MIT License - 詳見 [LICENSE](LICENSE) 檔案
-
----
-
-## 👨‍💻 作者
-
-**Jaa-ack**
-- GitHub: [@Jaa-ack](https://github.com/Jaa-ack)
-- 專案連結: [https://github.com/Jaa-ack/FruitOPS](https://github.com/Jaa-ack/FruitOPS)
-
----
-
 ## 📋 資料庫遷移指南
 
 ### SQL 檔案說明
@@ -636,6 +621,14 @@ Gemini API 生成回答
     ↓
 (Production 頁面) 儲存為 AIAdvice 日誌記錄
 ```
+
+---
+
+## 👨‍💻 作者
+
+**Jaa-ack**
+- GitHub: [@Jaa-ack](https://github.com/Jaa-ack)
+- 專案連結: [https://github.com/Jaa-ack/FruitOPS](https://github.com/Jaa-ack/FruitOPS)
 
 ---
 
